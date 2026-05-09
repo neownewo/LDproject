@@ -188,9 +188,9 @@ const months = [
 ]
 
 const yearOptions = computed(() => {
-  const years = gachaPools.value
-    .map((pool) => Number(pool.year))
-    .filter(Boolean)
+  const years = gachaPools.value.flatMap((pool) =>
+    getYearsCovered(pool.startDate, pool.endDate, pool.year)
+  )
 
   const currentYear = new Date().getFullYear()
   return [...new Set([...years, currentYear])].sort((a, b) => b - a)
@@ -198,7 +198,7 @@ const yearOptions = computed(() => {
 
 const yearlyPools = computed(() => {
   return gachaPools.value
-    .filter((pool) => Number(pool.year) === Number(selectedYear.value))
+    .filter((pool) => isPoolActiveInYear(pool, selectedYear.value))
     .sort(comparePools)
 })
 
@@ -348,6 +348,39 @@ function isInSelectedDateRange(pool) {
   return poolStart <= queryEnd && poolEnd >= queryStart
 }
 
+function getYearsCovered(startDate, endDate, fallbackYear) {
+  const start = new Date(startDate)
+  const end = new Date(endDate || startDate)
+  const years = []
+
+  if (Number.isNaN(start.getTime())) {
+    const year = Number(fallbackYear)
+    return year ? [year] : []
+  }
+
+  const startYear = start.getFullYear()
+  const endYear = Number.isNaN(end.getTime()) ? startYear : end.getFullYear()
+
+  for (let year = startYear; year <= endYear; year += 1) {
+    years.push(year)
+  }
+
+  return years
+}
+
+function isPoolActiveInYear(pool, year) {
+  const selected = Number(year)
+  if (!selected) return false
+
+  const poolStart = toTime(pool.startDate)
+  const poolEnd = toTime(pool.endDate || pool.startDate) || poolStart
+  const yearStart = toTime(`${selected}-01-01`)
+  const yearEnd = toTime(`${selected}-12-31`)
+
+  if (!poolStart) return Number(pool.year) === selected
+  return poolStart <= yearEnd && poolEnd >= yearStart
+}
+
 function getActiveMonths(startDate, endDate, year) {
   if (!startDate) return []
 
@@ -446,18 +479,18 @@ function pad(value) {
 .calendar-summary,
 .month-panel {
   border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 18px 42px rgba(31, 41, 55, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 14px 34px rgba(31, 41, 55, 0.07);
 }
 
 .calendar-hero {
   display: flex;
   justify-content: space-between;
-  gap: 24px;
+  gap: 22px;
   align-items: flex-end;
-  padding: 28px;
-  margin-bottom: 18px;
+  padding: 24px;
+  margin-bottom: 16px;
 }
 
 .eyebrow {
@@ -471,15 +504,15 @@ function pad(value) {
 .calendar-hero h1 {
   margin: 0;
   color: rgba(17, 24, 39, 0.92);
-  font-size: clamp(28px, 4vw, 42px);
+  font-size: clamp(26px, 4vw, 38px);
   line-height: 1.18;
 }
 
 .calendar-desc {
   max-width: 720px;
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: rgba(75, 85, 99, 0.9);
-  line-height: 1.8;
+  line-height: 1.75;
 }
 
 .year-picker,
@@ -519,8 +552,8 @@ function pad(value) {
   grid-template-columns: repeat(4, minmax(150px, 1fr));
   gap: 14px;
   align-items: end;
-  padding: 18px;
-  margin-bottom: 18px;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
 .rerun-check {
@@ -556,41 +589,41 @@ function pad(value) {
 .calendar-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  padding: 18px;
-  margin-bottom: 18px;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
 .summary-card {
-  border-radius: 18px;
-  padding: 16px;
-  background: linear-gradient(135deg, rgba(246, 199, 216, 0.26), rgba(184, 217, 255, 0.28));
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(246, 199, 216, 0.24), rgba(184, 217, 255, 0.26));
 }
 
 .summary-card span {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: rgba(75, 85, 99, 0.88);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
 }
 
 .summary-card strong {
   color: rgba(17, 24, 39, 0.92);
-  font-size: 28px;
+  font-size: 24px;
 }
 
 .month-panel {
-  padding: 22px;
-  margin-bottom: 18px;
+  padding: 18px;
+  margin-bottom: 16px;
 }
 
 .month-title-row {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .month-index {
@@ -604,7 +637,7 @@ function pad(value) {
 .month-title-row h2 {
   margin: 0;
   color: rgba(17, 24, 39, 0.92);
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .month-count {
@@ -619,7 +652,7 @@ function pad(value) {
 .timeline-list {
   position: relative;
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .timeline-list::before {
@@ -627,7 +660,7 @@ function pad(value) {
   position: absolute;
   top: 8px;
   bottom: 8px;
-  left: 36px;
+  left: 31px;
   width: 2px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(184, 217, 255, 0.85), rgba(246, 199, 216, 0.65));
@@ -636,14 +669,14 @@ function pad(value) {
 .pool-card {
   position: relative;
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
   overflow: hidden;
 }
 
 .pool-card.overlapping .pool-main {
-  border-color: rgba(244, 114, 182, 0.62);
-  box-shadow: 0 14px 30px rgba(244, 114, 182, 0.1);
+  border-color: rgba(244, 114, 182, 0.5);
+  box-shadow: 0 10px 24px rgba(244, 114, 182, 0.08);
 }
 
 .pool-card.rerun .pool-main {
@@ -656,38 +689,38 @@ function pad(value) {
   display: grid;
   place-items: center;
   align-self: start;
-  min-height: 70px;
-  border-radius: 18px;
+  min-height: 60px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 12px 24px rgba(31, 41, 55, 0.06);
+  box-shadow: 0 10px 20px rgba(31, 41, 55, 0.05);
 }
 
 .date-rail strong {
   color: rgba(17, 24, 39, 0.9);
-  font-size: 22px;
+  font-size: 19px;
   line-height: 1;
 }
 
 .date-rail span {
   color: rgba(107, 114, 128, 0.86);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
 }
 
 .pool-main {
   display: grid;
-  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  grid-template-columns: minmax(110px, 148px) minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid rgba(229, 231, 235, 0.95);
-  border-radius: 20px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12px 26px rgba(31, 41, 55, 0.07);
+  box-shadow: 0 10px 22px rgba(31, 41, 55, 0.06);
 }
 
 .pool-thumb-area,
 .pool-thumb-placeholder {
-  min-height: 160px;
+  min-height: 108px;
   overflow: hidden;
   background: rgba(243, 244, 246, 0.9);
 }
@@ -695,7 +728,7 @@ function pad(value) {
 .pool-thumb {
   width: 100%;
   height: 100%;
-  min-height: 160px;
+  min-height: 108px;
   display: block;
   object-fit: cover;
   background: rgba(229, 231, 235, 0.9);
@@ -706,23 +739,24 @@ function pad(value) {
   place-items: center;
   color: rgba(107, 114, 128, 0.84);
   font-weight: 900;
+  font-size: 13px;
 }
 
 .pool-card-body {
   display: flex;
-  min-height: 160px;
+  min-height: 108px;
   flex-direction: column;
-  padding: 16px;
+  padding: 12px;
 }
 
 .pool-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 7px;
   color: rgba(107, 114, 128, 0.9);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -734,7 +768,7 @@ function pad(value) {
 .overlap-badge,
 .rerun-badge {
   border-radius: 999px;
-  padding: 3px 8px;
+  padding: 2px 7px;
 }
 
 .pool-type {
@@ -758,39 +792,40 @@ function pad(value) {
 }
 
 .pool-card h3 {
-  margin: 0 0 10px;
+  margin: 0 0 7px;
   color: rgba(17, 24, 39, 0.92);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.35;
 }
 
 .character-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 5px;
+  margin-bottom: 7px;
 }
 
 .character-list span {
   border-radius: 999px;
-  padding: 4px 8px;
+  padding: 3px 7px;
   background: rgba(246, 199, 216, 0.24);
   color: rgba(75, 85, 99, 0.92);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
 .pool-note {
-  margin: auto 0 0;
-  color: rgba(75, 85, 99, 0.9);
-  line-height: 1.7;
+  margin: 0;
+  color: rgba(75, 85, 99, 0.88);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .empty-state,
 .empty-month {
   border: 1px dashed rgba(209, 213, 219, 0.95);
   border-radius: 18px;
-  padding: 24px;
+  padding: 22px;
   background: rgba(249, 250, 251, 0.9);
   color: rgba(107, 114, 128, 0.96);
   text-align: center;
@@ -822,13 +857,17 @@ function pad(value) {
   }
 
   .pool-main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(96px, 128px) minmax(0, 1fr);
   }
 
   .pool-thumb-area,
   .pool-thumb-placeholder,
   .pool-thumb {
-    min-height: 190px;
+    min-height: 96px;
+  }
+
+  .pool-card-body {
+    min-height: 96px;
   }
 }
 
@@ -836,7 +875,12 @@ function pad(value) {
   .calendar-hero {
     display: grid;
     align-items: stretch;
-    padding: 22px;
+    padding: 18px;
+  }
+
+  .calendar-desc {
+    font-size: 13px;
+    line-height: 1.65;
   }
 
   .filter-panel,
@@ -844,32 +888,120 @@ function pad(value) {
     grid-template-columns: 1fr;
   }
 
-  .month-panel {
-    padding: 18px;
-  }
-
-  .pool-card {
-    grid-template-columns: 1fr;
-  }
-
-  .timeline-list::before {
+  .calendar-summary {
     display: none;
   }
 
-  .date-rail {
-    display: flex;
-    justify-content: flex-start;
+  .month-panel {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .month-title-row {
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .month-title-row h2 {
+    font-size: 19px;
+  }
+
+  .month-count {
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+
+  .timeline-list {
     gap: 8px;
+    padding-left: 4px;
+  }
+
+  .timeline-list::before {
+    display: block;
+    left: 21px;
+    top: 6px;
+    bottom: 6px;
+  }
+
+  .pool-card {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .date-rail {
+    width: 42px;
+    min-height: 42px;
+    border-radius: 50%;
+    padding: 0;
+  }
+
+  .date-rail strong {
+    font-size: 15px;
+  }
+
+  .date-rail span {
+    display: none;
+  }
+
+  .pool-main {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr);
+    align-items: center;
+    border-radius: 14px;
+    min-height: 62px;
+    box-shadow: 0 8px 18px rgba(31, 41, 55, 0.05);
+  }
+
+  .pool-thumb-area,
+  .pool-thumb-placeholder,
+  .pool-thumb {
+    min-height: 62px;
+    height: 62px;
+  }
+
+  .pool-thumb-placeholder {
+    font-size: 10px;
+  }
+
+  .pool-card-body {
     min-height: auto;
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
 
   .pool-meta {
-    display: grid;
+    margin: 0 0 4px;
+    gap: 0;
+    font-size: 11px;
+  }
+
+  .pool-type,
+  .overlap-badge,
+  .rerun-badge,
+  .character-list,
+  .pool-note {
+    display: none !important;
   }
 
   .range-text {
     margin-left: 0;
+    color: rgba(107, 114, 128, 0.88);
+    font-size: 11px;
+  }
+
+  .pool-card h3 {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .empty-month {
+    padding: 16px;
+    font-size: 13px;
   }
 }
 </style>
