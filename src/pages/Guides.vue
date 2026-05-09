@@ -15,8 +15,13 @@
       </label>
     </section>
 
-    <div v-if="isLoading" class="empty-state">攻略資料讀取中...</div>
-    <div v-else-if="loadError" class="empty-state">{{ loadError }}</div>
+    <div v-if="loading" class="empty-state status-state">
+      攻略資料讀取中…
+    </div>
+
+    <div v-else-if="errorMessage" class="empty-state status-state error-state">
+      {{ errorMessage }}
+    </div>
 
     <section
       v-else
@@ -51,9 +56,21 @@
               <span v-for="tag in guide.tags" :key="tag">#{{ tag }}</span>
             </div>
 
-            <a v-if="guide.link" class="guide-link" :href="guide.link" target="_blank" rel="noopener noreferrer">
+            <router-link
+              v-if="guide.link"
+              class="guide-link"
+              :to="{
+                path: '/guide-post',
+                query: {
+                  url: guide.link,
+                  title: guide.title,
+                  category: guide.category,
+                  date: guide.date
+                }
+              }"
+            >
               查看攻略
-            </a>
+            </router-link>
             <router-link v-else-if="guide.route" class="guide-link" :to="guide.route">
               查看攻略
             </router-link>
@@ -75,12 +92,10 @@ import { guideGroups } from '../guideData'
 
 const keyword = ref('')
 const guides = ref([])
-const isLoading = ref(false)
-const loadError = ref('')
+const loading = ref(true)
+const errorMessage = ref('')
 
-// Google Sheet 請使用「發布到網路」後的 CSV 連結，網址結尾通常會是：pub?output=csv
-// 注意：不是 /edit，也不是 pubhtml。
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTQY0KD2HeAl1lJHSraPxafcI_s1xJr024Gi0onLab4goXy_LLR7udjsgF-BBxwjdm6EkWxXUL4uvET/pub?output=csv'
+const SHEET_API_URL = 'https://opensheet.elk.sh/1XWvnyr8B36KSfqCNp3rKbQzztVEMB5fEb2869eo4CeU/遊戲攻略'
 
 const guideSections = computed(() => {
   const text = keyword.value.toLowerCase()
@@ -103,95 +118,48 @@ const guideSections = computed(() => {
   })
 })
 
-function parseCSV(text) {
-  const rows = []
-  let row = []
-  let cell = ''
-  let inQuotes = false
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i]
-    const nextChar = text[i + 1]
-
-    if (char === '"' && inQuotes && nextChar === '"') {
-      cell += '"'
-      i += 1
-      continue
-    }
-
-    if (char === '"') {
-      inQuotes = !inQuotes
-      continue
-    }
-
-    if (char === ',' && !inQuotes) {
-      row.push(cell.trim())
-      cell = ''
-      continue
-    }
-
-    if ((char === '\n' || char === '\r') && !inQuotes) {
-      if (char === '\r' && nextChar === '\n') i += 1
-      row.push(cell.trim())
-      if (row.some(value => value !== '')) rows.push(row)
-      row = []
-      cell = ''
-      continue
-    }
-
-    cell += char
-  }
-
-  row.push(cell.trim())
-  if (row.some(value => value !== '')) rows.push(row)
-
-  if (!rows.length) return []
-
-  const headers = rows.shift().map(header => header.trim())
-
-  return rows.map((values) => {
-    const item = {}
-
-    headers.forEach((header, index) => {
-      item[header] = values[index]?.trim() || ''
-    })
-
-    return {
-      level: item.level,
-      category: item.category,
-      date: item.date,
-      title: item.title,
-      summary: item.summary,
-      image: item.image,
-      link: item.link,
-      route: item.route,
-      tags: item.tags
-        ? item.tags.split(/[、,，]/).map(tag => tag.trim()).filter(Boolean)
-        : [],
-    }
-  }).filter(item => item.level && item.title)
-}
-
 onMounted(async () => {
-  isLoading.value = true
-  loadError.value = ''
-
   try {
-    const res = await fetch(SHEET_CSV_URL, { cache: 'no-store' })
+    loading.value = true
+    errorMessage.value = ''
 
-    if (!res.ok) {
-      throw new Error(`讀取 Google Sheet 失敗：${res.status}`)
-    }
+    const res = await fetch(SHEET_API_URL)
+    if (!res.ok) throw new Error(`Google Sheet 資料讀取失敗：${res.status}`)
 
-    const text = await res.text()
-    guides.value = parseCSV(text)
+    const data = await res.json()
+    guides.value = data
+      .filter((item) => item.level || item.title)
+      .map(normalizeGuide)
   } catch (error) {
     console.error(error)
-    loadError.value = '攻略資料讀取失敗，請確認 Google Sheet 已發布成 CSV，且網址結尾是 pub?output=csv。'
+    errorMessage.value = '攻略資料讀取失敗，請稍後再試。'
   } finally {
-    isLoading.value = false
+    loading.value = false
   }
 })
+
+function normalizeGuide(item) {
+  return {
+    level: String(item.level || '').trim(),
+    category: String(item.category || '').trim(),
+    date: String(item.date || '').trim(),
+    title: String(item.title || '').trim(),
+    summary: String(item.summary || '').trim(),
+    tags: parseTags(item.tags),
+    image: String(item.image || '').trim(),
+    link: String(item.link || '').trim(),
+    route: String(item.route || '').trim(),
+  }
+}
+
+function parseTags(value) {
+  if (Array.isArray(value)) return value.map((tag) => String(tag).trim()).filter(Boolean)
+
+  return String(value || '')
+    .split(/[、，,]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+}
 </script>
 
 <style scoped>
@@ -312,17 +280,38 @@ onMounted(async () => {
 }
 
 .guide-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  display: flex;
   gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 4px 14px;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.guide-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.guide-grid::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(229, 231, 235, 0.58);
+}
+
+.guide-grid::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(184, 217, 255, 0.9);
 }
 
 .guide-card {
+  flex: 0 0 clamp(240px, 34vw, 320px);
   overflow: hidden;
   border: 1px solid rgba(229, 231, 235, 0.95);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 12px 26px rgba(31, 41, 55, 0.07);
+  scroll-snap-align: start;
 }
 
 .guide-thumb-wrap {
@@ -339,6 +328,9 @@ onMounted(async () => {
 }
 
 .guide-card-body {
+  display: flex;
+  min-height: 230px;
+  flex-direction: column;
   padding: 16px;
 }
 
@@ -383,7 +375,8 @@ onMounted(async () => {
 
 .guide-link {
   display: inline-flex;
-  margin-top: 14px;
+  margin-top: auto;
+  padding-top: 14px;
   color: rgba(79, 70, 229, 0.94);
   font-weight: 900;
   text-decoration: none;
@@ -400,6 +393,16 @@ onMounted(async () => {
   background: rgba(249, 250, 251, 0.9);
   color: rgba(107, 114, 128, 0.96);
   text-align: center;
+}
+
+.status-state {
+  margin-bottom: 18px;
+}
+
+.error-state {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(254, 242, 242, 0.92);
+  color: rgba(153, 27, 27, 0.92);
 }
 
 @media (max-width: 900px) {
@@ -503,7 +506,13 @@ onMounted(async () => {
   }
 
   .guide-grid {
-    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-right: -18px;
+    padding-right: 18px;
+  }
+
+  .guide-card {
+    flex-basis: min(82vw, 300px);
   }
 }
 </style>

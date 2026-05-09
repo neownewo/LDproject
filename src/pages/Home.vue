@@ -7,7 +7,7 @@
         desc="本攻略網站皆為個人蒐集資料開發架設，若有任何問題請先聯繫我的脆處理 @neiwniew"
       >
         <template #actions>
-          <router-link class="btn btn-primary" to="/guides">新手指南</router-link>
+          <router-link class="btn btn-primary" to="/guides">遊戲攻略</router-link>
           <router-link class="btn" to="/gacha">卡池行事曆</router-link>
           <router-link class="btn" to="/merch">周邊整理</router-link>
         </template>
@@ -46,10 +46,10 @@
       </div>
     </PageSection>
 
-    <PageSection id="gacha" eyebrow="CALENDAR" title="卡池歷程整理" desc="用行事曆視覺化每期卡池縮圖代表顯示">
+    <PageSection id="gacha" eyebrow="CALENDAR" title="卡池歷程整理" desc="查看過去的卡池紀錄">
       <FeatureList :items="gacha" />
       <div class="actions">
-        <router-link class="btn btn-primary" to="/">查看卡池行事曆</router-link>
+        <router-link class="btn btn-primary" to="/gacha">查看卡池行事曆</router-link>
       </div>
     </PageSection>
 
@@ -146,16 +146,17 @@ const nextCountdownEvent = computed(() => {
 })
 
 const beginner = [
-  { label: '開局', value: '先把資源與每日流程跑順' },
-  { label: '養成', value: '用簡單表格整理優先順序' },
+  { label: '新手須知', value: '新手開局不能錯過的資源與免費五星卡!' },
+  { label: '中級獵人須知', value: '日卡套裝、基礎芯核搭配' },
+  { label: '高級獵人攻略', value: '深網、卡利花、成就' },
 ]
 const gacha = [
-  { label: '視覺化', value: '月曆呈現每期卡池起訖，事件帶縮圖' },
-  { label: '資料維護', value: '用 JSON 新增每期卡池，不用改程式' },
+ // { label: '視覺化', value: '月曆呈現每期卡池起訖，事件帶縮圖' },
+  //{ label: '資料維護', value: '用 JSON 新增每期卡池，不用改程式' },
 ]
 const merch = [
   { label: '分類', value: '立牌 / 徽章 / 服飾 / 娃娃 / 其他' },
-  { label: '欄位', value: '名稱、類別、發售日、來源連結、備註' },
+  { label: '欄位', value: '名稱、類別、備註' },
 ]
 </script>
 
