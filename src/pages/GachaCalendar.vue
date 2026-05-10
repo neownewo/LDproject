@@ -5,7 +5,8 @@
         <p class="eyebrow">GACHA CALENDAR</p>
         <h1>卡池月曆</h1>
         <p class="calendar-desc">
-          依年份瀏覽卡池時程，資料由 Google Sheet 維護。卡片會依照卡池區間排序；若日期重疊，會標記同期重疊。預設隱藏復刻與免費五星，勾選後才顯示對應資料。
+          依年份瀏覽單人、多人、日卡池與免費五星時程；可依需求篩選卡池類型，並隱藏復刻或免費五星。<br>
+          *電腦版可看到統計數字
         </p>
       </div>
 
@@ -36,6 +37,7 @@
           <option value="all">全部</option>
           <option value="single">單人卡池</option>
           <option value="multi">多人卡池</option>
+          <option value="daily">日卡池</option>
           <option value="free">免費五星</option>
         </select>
       </label>
@@ -56,8 +58,8 @@
       </label>
 
       <label class="rerun-check">
-        <input v-model="showFreeFiveStar" type="checkbox" />
-        <span>顯示免費五星</span>
+        <input v-model="hideFreeStar" type="checkbox" />
+        <span>隱藏免費五星</span>
       </label>
 
       <button class="clear-filter-btn" type="button" @click="resetFilters">
@@ -88,8 +90,12 @@
           <strong>{{ multiPoolsCount }}</strong>
         </div>
         <div class="summary-card">
+          <span>日卡池</span>
+          <strong>{{ dailyPoolsCount }}</strong>
+        </div>
+        <div class="summary-card">
           <span>免費五星</span>
-          <strong>{{ freePoolsCount }}</strong>
+          <strong>{{ freeStarPoolsCount }}</strong>
         </div>
       </section>
 
@@ -99,64 +105,79 @@
             <p class="month-index">{{ selectedYear }} / {{ pad(month.value) }}</p>
             <h2>{{ month.label }}</h2>
           </div>
-          <span class="month-count">{{ poolsByMonth[month.value]?.length || 0 }} 個卡池</span>
+          <span class="month-count">{{ getMonthPoolCount(month.value) }} 個卡池</span>
         </div>
 
         <div v-if="poolsByMonth[month.value]?.length" class="timeline-list">
-          <article
-            v-for="pool in poolsByMonth[month.value]"
-            :key="`${pool.name}-${pool.startDate}-${pool.endDate}`"
-            :class="['pool-card', { overlapping: pool.hasOverlap, rerun: pool.isRerun, free: pool.isFreeFiveStar }]"
+          <div
+            v-for="group in poolsByMonth[month.value]"
+            :key="group.displayDate"
+            class="timeline-day-group"
           >
             <div class="date-rail">
-              <strong>{{ getDay(pool.startDate) }}</strong>
-              <span>{{ getMonthDay(pool.startDate) }}</span>
+              <strong>{{ group.day }}</strong>
+              <span>{{ group.monthDay }}</span>
             </div>
 
-            <div class="pool-main">
-              <div class="pool-thumb-area">
-                <img
-                  v-if="pool.image"
-                  class="pool-thumb"
-                  :src="pool.image"
-                  :alt="`${pool.name} 縮圖`"
-                  loading="lazy"
-                />
+            <div class="timeline-day-pools">
+              <article
+                v-for="pool in group.pools"
+                :key="`${pool.name}-${pool.startDate}-${pool.endDate}`"
+                :class="['pool-card', { overlapping: pool.hasOverlap, rerun: pool.isRerun, 'free-star': pool.isFreeStar }]"
+              >
+                <div class="pool-main">
+                  <div class="pool-thumb-area">
+                    <template v-if="getPoolImages(pool.image).length">
+                      <img
+                        class="pool-thumb"
+                        :src="getCarouselImage(pool)"
+                        :alt="`${pool.name} 縮圖`"
+                        loading="lazy"
+                      />
 
-                <div v-else class="pool-thumb-placeholder">
-                  <span>{{ pool.typeLabel }}</span>
+                      <div v-if="getPoolImages(pool.image).length > 1" class="carousel-dots">
+                        <span
+                          v-for="(_, index) in getPoolImages(pool.image)"
+                          :key="index"
+                          :class="{ active: index === getActiveCarouselIndex(pool.image) }"
+                        ></span>
+                      </div>
+                    </template>
+
+                    <div v-else class="pool-thumb-placeholder">
+                      <span>{{ pool.typeLabel }}</span>
+                    </div>
+                  </div>
+
+                  <div class="pool-card-body">
+                    <div class="pool-meta">
+                      <span :class="['pool-type', pool.poolType]">
+                        {{ pool.typeLabel }}
+                      </span>
+                      <span v-if="pool.isRerun" class="rerun-badge">
+                        復刻
+                      </span>
+                     
+                      <span v-if="pool.hasOverlap" class="overlap-badge">
+                        同期重疊
+                      </span>
+                      <span class="range-text">{{ formatRange(pool.startDate, pool.endDate) }}</span>
+                    </div>
+
+                    <h3>{{ pool.name }}</h3>
+
+                    <div v-if="pool.characters.length" class="character-list">
+                      <span v-for="character in pool.characters" :key="character">
+                        {{ character }}
+                      </span>
+                    </div>
+
+                    <p v-if="pool.note" class="pool-note">{{ pool.note }}</p>
+                  </div>
                 </div>
-              </div>
-
-              <div class="pool-card-body">
-                <div class="pool-meta">
-                  <span :class="['pool-type', pool.poolType]">
-                    {{ pool.typeLabel }}
-                  </span>
-                  <span v-if="pool.isRerun" class="rerun-badge">
-                    復刻
-                  </span>
-                  <span v-if="pool.isFreeFiveStar" class="free-badge">
-                    免費五星
-                  </span>
-                  <span v-if="pool.hasOverlap" class="overlap-badge">
-                    同期重疊
-                  </span>
-                  <span class="range-text">{{ formatRange(pool.startDate, pool.endDate) }}</span>
-                </div>
-
-                <h3>{{ pool.name }}</h3>
-
-                <div v-if="pool.characters.length" class="character-list">
-                  <span v-for="character in pool.characters" :key="character">
-                    {{ character }}
-                  </span>
-                </div>
-
-                <p v-if="pool.note" class="pool-note">{{ pool.note }}</p>
-              </div>
+              </article>
             </div>
-          </article>
+          </div>
         </div>
 
         <div v-else class="empty-month">
@@ -168,7 +189,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import AppLayout from './AppLayout.vue'
 
 // 將這裡換成你的 opensheet 網址
@@ -184,7 +205,9 @@ const selectedCharacter = ref('all')
 const filterStartDate = ref('')
 const filterEndDate = ref('')
 const showRerun = ref(false)
-const showFreeFiveStar = ref(false)
+const hideFreeStar = ref(false)
+const carouselIndex = ref(0)
+let carouselTimer = null
 
 const months = [
   { value: 1, label: '一月' },
@@ -228,15 +251,16 @@ const filteredPools = computed(() => {
       selectedCharacter.value === 'all' || pool.characters.includes(selectedCharacter.value)
     const matchDateRange = isInSelectedDateRange(pool)
     const matchRerun = showRerun.value || !pool.isRerun
-    const matchFreeFiveStar = showFreeFiveStar.value || !pool.isFreeFiveStar
+    const matchFreeStar = !hideFreeStar.value || pool.poolType !== 'free'
 
-    return matchType && matchCharacter && matchDateRange && matchRerun && matchFreeFiveStar
+    return matchType && matchCharacter && matchDateRange && matchRerun && matchFreeStar
   })
 })
 
 const singlePoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'single').length)
 const multiPoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'multi').length)
-const freePoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'free').length)
+const dailyPoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'daily').length)
+const freeStarPoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'free').length)
 
 const poolsByMonth = computed(() => {
   const result = months.reduce((acc, month) => {
@@ -251,17 +275,25 @@ const poolsByMonth = computed(() => {
     })
   })
 
-  Object.keys(result).forEach((month) => {
-    result[month] = markOverlaps(result[month].sort(comparePools))
+  Object.keys(result).forEach((monthKey) => {
+    const month = Number(monthKey)
+    const markedPools = markOverlaps(result[month].sort((a, b) => comparePoolsByDisplayDate(a, b, month)))
+    result[month] = groupPoolsByDisplayDate(markedPools, month)
   })
 
   return result
 })
 
+function getMonthPoolCount(monthValue) {
+  return (poolsByMonth.value[monthValue] || []).reduce((sum, group) => sum + group.pools.length, 0)
+}
+
 onMounted(async () => {
   try {
     loading.value = true
     errorMessage.value = ''
+
+    startCarouselTimer()
 
     const res = await fetch(SHEET_API_URL)
     if (!res.ok) throw new Error(`Google Sheet 資料讀取失敗：${res.status}`)
@@ -283,6 +315,39 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => {
+  if (carouselTimer) {
+    window.clearInterval(carouselTimer)
+  }
+})
+
+function startCarouselTimer() {
+  if (carouselTimer) return
+
+  carouselTimer = window.setInterval(() => {
+    carouselIndex.value += 1
+  }, 2800)
+}
+
+function getPoolImages(imageText) {
+  return String(imageText || '')
+    .split('|')
+    .map((url) => url.trim())
+    .filter(Boolean)
+}
+
+function getActiveCarouselIndex(imageText) {
+  const images = getPoolImages(imageText)
+  if (!images.length) return 0
+  return carouselIndex.value % images.length
+}
+
+function getCarouselImage(pool) {
+  const images = getPoolImages(pool.image)
+  if (!images.length) return ''
+  return images[getActiveCarouselIndex(pool.image)]
+}
+
 function normalizePool(item) {
   const name = readField(item, ['卡池名稱', 'name'])
   const year = readField(item, ['卡池年份', 'year'])
@@ -292,13 +357,15 @@ function normalizePool(item) {
   const characters = parseList(readField(item, ['角色', '登場角色', 'characters']))
   const note = readField(item, ['備註', 'note'])
   const isRerun = parseBoolean(readField(item, ['是否為復刻', '復刻', 'isRerun', 'rerun']))
-  const isFreeFiveStar = parseBoolean(readField(item, ['是否為免費五星', '免費五星', 'isFreeFiveStar', 'freeFiveStar', 'free']))
-
-  const poolTypeFromSheet = readField(item, ['卡池類型', 'type', 'poolType']).toLowerCase()
+  const poolTypeRaw = readField(item, ['卡池類型', 'type', 'poolType'])
+  const poolTypeFromSheet = poolTypeRaw.toLowerCase()
 
   let poolType = 'single'
-  if (isFreeFiveStar || poolTypeFromSheet.includes('免費') || poolTypeFromSheet.includes('free')) {
+
+  if (poolTypeFromSheet.includes('免費') || poolTypeFromSheet.includes('free')) {
     poolType = 'free'
+  } else if (poolTypeFromSheet.includes('daily') || poolTypeFromSheet.includes('日卡')) {
+    poolType = 'daily'
   } else if (
     poolTypeFromSheet.includes('multi') ||
     poolTypeFromSheet.includes('多人') ||
@@ -316,17 +383,11 @@ function normalizePool(item) {
     characters,
     note,
     isRerun,
-    isFreeFiveStar,
+    isFreeStar: poolType === 'free',
     poolType,
-    typeLabel: getPoolTypeLabel(poolType),
+    typeLabel: getTypeLabel(poolType),
     hasOverlap: false,
   }
-}
-
-function getPoolTypeLabel(poolType) {
-  if (poolType === 'free') return '免費五星'
-  if (poolType === 'multi') return '多人卡池'
-  return '單人卡池'
 }
 
 function readField(item, keys) {
@@ -342,6 +403,17 @@ function normalizeDate(value) {
   if (!value) return ''
 
   const text = String(value).trim().replaceAll('/', '-')
+
+  // 支援 Google Sheet / Excel 日期序號，例如 45377
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const serial = Number(text)
+    if (serial > 30000 && serial < 70000) {
+      const utcDays = Math.floor(serial - 25569)
+      const date = new Date(utcDays * 86400 * 1000)
+      return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
+    }
+  }
+
   const parts = text.split('-')
 
   if (parts.length === 3) {
@@ -361,7 +433,18 @@ function parseList(value) {
 
 function parseBoolean(value) {
   const text = String(value || '').trim().toLowerCase()
-  return ['true', 'yes', 'y', '1', '是', '復刻'].includes(text)
+  return ['true', 'yes', 'y', '1', '是', '有', '顯示', '復刻', '免費5星'].includes(text)
+}
+
+function getTypeLabel(poolType) {
+  const labels = {
+    single: '單人卡池',
+    multi: '多人卡池',
+    daily: '日卡池',
+    free: '免費五星',
+  }
+
+  return labels[poolType] || '單人卡池'
 }
 
 function isInSelectedDateRange(pool) {
@@ -471,7 +554,7 @@ function resetFilters() {
   selectedType.value = 'all'
   selectedCharacter.value = 'all'
   showRerun.value = false
-  showFreeFiveStar.value = false
+  hideFreeStar.value = false
 }
 
 function formatRange(startDate, endDate) {
@@ -480,16 +563,57 @@ function formatRange(startDate, endDate) {
   return `${startDate} ~ ${endDate}`
 }
 
-function getDay(date) {
-  if (!date) return '--'
-  return pad(new Date(date).getDate())
+function getDisplayDate(pool, month) {
+  const year = Number(selectedYear.value)
+  const start = new Date(pool.startDate)
+  const end = new Date(pool.endDate || pool.startDate)
+
+  if (Number.isNaN(start.getTime())) return pool.startDate || ''
+
+  const startYear = start.getFullYear()
+  const startMonth = start.getMonth() + 1
+  const endYear = Number.isNaN(end.getTime()) ? startYear : end.getFullYear()
+  const endMonth = Number.isNaN(end.getTime()) ? startMonth : end.getMonth() + 1
+
+  // 在卡池開始的月份，顯示起始日
+  if (startYear === year && startMonth === month) {
+    return pool.startDate
+  }
+
+  // 跨月份或跨年度卡池，在結束月份顯示結束日
+  if (endYear === year && endMonth === month) {
+    return pool.endDate || pool.startDate
+  }
+
+  // 若卡池橫跨整個中間月份，顯示該月份 1 號，讓時間軸順序合理
+  return `${year}-${pad(month)}-01`
 }
 
-function getMonthDay(date) {
-  if (!date) return ''
-  const d = new Date(date)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`
+function comparePoolsByDisplayDate(a, b, month) {
+  const displayDiff = toTime(getDisplayDate(a, month)) - toTime(getDisplayDate(b, month))
+  if (displayDiff !== 0) return displayDiff
+
+  return comparePools(a, b)
+}
+
+function groupPoolsByDisplayDate(pools, month) {
+  const groups = new Map()
+
+  pools.forEach((pool) => {
+    const displayDate = getDisplayDate(pool, month)
+    if (!groups.has(displayDate)) {
+      groups.set(displayDate, {
+        displayDate,
+        day: displayDate ? displayDate.slice(8, 10) : '--',
+        monthDay: displayDate ? displayDate.slice(5, 10) : '',
+        pools: [],
+      })
+    }
+
+    groups.get(displayDate).pools.push(pool)
+  })
+
+  return [...groups.values()].sort((a, b) => toTime(a.displayDate) - toTime(b.displayDate))
 }
 
 function toTime(date) {
@@ -617,7 +741,7 @@ function pad(value) {
 
 .calendar-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   padding: 16px;
   margin-bottom: 16px;
@@ -695,11 +819,22 @@ function pad(value) {
   background: linear-gradient(180deg, rgba(184, 217, 255, 0.85), rgba(246, 199, 216, 0.65));
 }
 
-.pool-card {
+.timeline-day-group {
   position: relative;
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
+}
+
+.timeline-day-pools {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pool-card {
+  position: relative;
+  display: block;
   overflow: hidden;
 }
 
@@ -712,8 +847,8 @@ function pad(value) {
   background: rgba(255, 251, 235, 0.88);
 }
 
-.pool-card.free .pool-main {
-  background: rgba(239, 246, 255, 0.9);
+.pool-card.free-star .pool-main {
+  background: rgba(250, 245, 255, 0.9);
 }
 
 .date-rail {
@@ -753,6 +888,7 @@ function pad(value) {
 
 .pool-thumb-area,
 .pool-thumb-placeholder {
+  position: relative;
   min-height: 108px;
   overflow: hidden;
   background: rgba(243, 244, 246, 0.9);
@@ -765,6 +901,30 @@ function pad(value) {
   display: block;
   object-fit: cover;
   background: rgba(229, 231, 235, 0.9);
+}
+
+.carousel-dots {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.carousel-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.55);
+}
+
+.carousel-dots span.active {
+  width: 12px;
+  background: rgba(99, 102, 241, 0.85);
 }
 
 .pool-thumb-placeholder {
@@ -800,7 +960,7 @@ function pad(value) {
 .pool-type,
 .overlap-badge,
 .rerun-badge,
-.free-badge {
+.free-star-badge {
   border-radius: 999px;
   padding: 2px 7px;
 }
@@ -815,9 +975,14 @@ function pad(value) {
   color: rgba(157, 23, 77, 0.78);
 }
 
+.pool-type.daily {
+  background: rgba(221, 214, 254, 0.46);
+  color: rgba(91, 33, 182, 0.82);
+}
+
 .pool-type.free {
-  background: rgba(191, 219, 254, 0.45);
-  color: rgba(30, 64, 175, 0.88);
+  background: rgba(254, 240, 138, 0.42);
+  color: rgba(133, 77, 14, 0.9);
 }
 
 .overlap-badge {
@@ -830,9 +995,9 @@ function pad(value) {
   color: rgba(22, 101, 52, 0.9);
 }
 
-.free-badge {
-  background: rgba(219, 234, 254, 0.95);
-  color: rgba(30, 64, 175, 0.9);
+.free-star-badge {
+  background: rgba(254, 240, 138, 0.58);
+  color: rgba(133, 77, 14, 0.95);
 }
 
 .pool-card h3 {
@@ -967,10 +1132,18 @@ function pad(value) {
     bottom: 6px;
   }
 
-  .pool-card {
+  .timeline-day-group {
     grid-template-columns: 42px minmax(0, 1fr);
     gap: 8px;
-    align-items: center;
+    align-items: start;
+  }
+
+  .timeline-day-pools {
+    gap: 8px;
+  }
+
+  .pool-card {
+    display: block;
   }
 
   .date-rail {
@@ -1008,6 +1181,22 @@ function pad(value) {
     font-size: 10px;
   }
 
+  .carousel-dots {
+    right: 5px;
+    bottom: 5px;
+    gap: 3px;
+    padding: 3px 5px;
+  }
+
+  .carousel-dots span {
+    width: 4px;
+    height: 4px;
+  }
+
+  .carousel-dots span.active {
+    width: 9px;
+  }
+
   .pool-card-body {
     min-height: auto;
     padding: 8px 10px;
@@ -1022,7 +1211,7 @@ function pad(value) {
   .pool-type,
   .overlap-badge,
   .rerun-badge,
-  .free-badge,
+  .free-star-badge,
   .character-list,
   .pool-note {
     display: none !important;
@@ -1035,13 +1224,18 @@ function pad(value) {
   }
 
   .pool-card h3 {
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.35;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+}
 
   .empty-month {
     padding: 16px;

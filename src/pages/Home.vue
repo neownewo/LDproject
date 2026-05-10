@@ -4,13 +4,25 @@
     <section id="hero">
       <HeroBanner
         :title="SITE.title"
-        desc="本攻略網站皆為個人蒐集資料開發架設，若有任何問題請先聯繫我的脆處理 @neiwniew"
+        desc="本攻略網站皆為個人蒐集資料開發架設，若有任何問題請先聯繫我的脆處理"
       >
-        <template #actions>
-          <router-link class="btn btn-primary" to="/guides">遊戲攻略</router-link>
-          <router-link class="btn" to="/gacha">卡池月曆</router-link>
-          <router-link class="btn" to="/merch">周邊整理</router-link>
-        </template>
+      <template #actions>
+        <a
+          href="https://www.threads.net/@neiwneiw"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="threads-link"
+        >
+        <img
+          src="https://cdn-icons-png.flaticon.com/512/12105/12105336.png"
+          alt="Threads"
+          class="threads-icon"
+        />
+        </a>
+        <router-link class="btn btn-primary" to="/guides">遊戲攻略</router-link>
+        <router-link class="btn" to="/gacha">卡池行事曆</router-link>
+        <!--<router-link class="btn" to="/merch">周邊整理</router-link>-->
+      </template>
       </HeroBanner>
     </section>
 
@@ -257,5 +269,20 @@ const merch = [
   .actions {
     flex-wrap: wrap;
   }
+}
+.threads-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.threads-icon {
+  width: 24px;
+  height: 24px;
+  transition: 0.2s;
+}
+
+.threads-icon:hover {
+  opacity: 0.7;
+  transform: scale(1.05);
 }
 </style>

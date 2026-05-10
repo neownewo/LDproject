@@ -4,7 +4,7 @@ import Home from '../pages/Home.vue'
 import Guides from '../pages/Guides.vue'
 import GuidePost from '../pages/GuidePost.vue'
 import Gacha from '../pages/GachaCalendar.vue'
-import Merch from '../pages/Guides.vue'
+import Merch from '../pages/Home.vue'
 
 const routes = [
   { path: '/', component: Home },

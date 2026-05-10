@@ -53,8 +53,17 @@
       </nav>
     </aside>
 
-    <main class="home-content">
+    <main class="content">
       <slot />
+
+      <footer class="site-footer">
+        <p>
+          本網站為個人整理與非官方攻略資訊站，僅供玩家交流與資料整理使用。
+        </p>
+        <p>
+          遊戲圖片、角色名稱、活動資訊與相關素材版權皆屬《戀與深空》官方及所屬公司所有。
+        </p>
+      </footer>
     </main>
 
     <slot name="fixed" />
@@ -287,5 +296,23 @@ const isMobileMenuOpen = ref(false)
   .menu-label {
     display: inline !important;
   }
+}
+.site-footer {
+  margin-top: 48px;
+
+  padding: 24px 20px 40px;
+
+  text-align: center;
+
+  font-size: 11px;
+  line-height: 1.8;
+
+  color: #999;
+
+  opacity: 0.9;
+}
+
+.site-footer p {
+  margin: 4px 0;
 }
 </style>

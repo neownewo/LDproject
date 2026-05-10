@@ -4,7 +4,7 @@
       <p class="eyebrow">GUIDE</p>
       <h1>攻略整理</h1>
       <p class="guide-desc">
-        整理新手入門、養成方向、活動重點與常用資料。之後可以改成讀取 JSON 或 Google Sheet，讓內容維護更輕鬆。
+        整理新手入門、養成方向、重點與常用資料。
       </p>
     </section>
 
