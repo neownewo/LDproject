@@ -4,7 +4,7 @@
       <div class="post-header">
         <button class="back-btn" type="button" @click="goBack">← 返回攻略列表</button>
 
-        <p class="eyebrow">GUIDE ARTICLE</p>
+        <p class="eyebrow">SUNTEAM ARTICLE</p>
         <h1>{{ articleTitle }}</h1>
 
         <div class="post-meta">

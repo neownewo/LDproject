@@ -7,5 +7,7 @@ export const mainMenuItems = [
 
   { label: '卡池行事曆', href: '/gacha', icon: '🗓️' },
 
+  { label: '日卡套組介紹', href: '/sunteam', icon: '☀️' },
+
   { label: '周邊整理', href: '/merch', icon: '🎁' },
 ]

@@ -65,6 +65,13 @@
       </div>
     </PageSection>
 
+    <PageSection id="sunteam" eyebrow="SUN" title="日卡套組介紹" desc="各男主日卡套介紹">
+      <FeatureList :items="sunteam" />
+      <div class="actions">
+        <router-link class="btn btn-primary" to="/sunteam">查看日卡套組介紹</router-link>
+      </div>
+    </PageSection>
+
     <PageSection id="merch" eyebrow="LIST" title="周邊整理" desc="分類整理與連結，方便查找與比對">
       <FeatureList :items="merch" />
       <div class="actions">

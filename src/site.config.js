@@ -6,6 +6,7 @@ export const SITE = {
     { id: 'howto', title: '玩法介紹', desc: '整理重點並連到官方介紹頁', href: 'https://loveanddeepspace.infoldgames.com/zh-TW/home' },
     { id: 'beginner', title: '新手指南', desc: '開局資源、每日必做、入門觀念', to: '/guides' },
     { id: 'gacha', title: '卡池歷程整理', desc: '用行事曆視覺化每期卡池縮圖', to: '/gacha' },
+    { id: 'sunteam', title: '日卡套組介紹', desc: '各男主日卡套介紹', to: '/sunteam' },
     { id: 'merch', title: '周邊整理', desc: '分類、整理、連結與備註', to: '/merch' },
   ],
 }
