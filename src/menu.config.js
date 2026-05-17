@@ -9,5 +9,7 @@ export const mainMenuItems = [
 
   { label: '日卡套組介紹', href: '/sunteam', icon: '☀️' },
 
-  { label: '周邊整理', href: '/merch', icon: '🎁' },
+  { label: '應援活動資訊', href: '/events', icon: '🧡' },
+
+ // { label: '周邊整理', href: '/merch', icon: '🎁' },
 ]

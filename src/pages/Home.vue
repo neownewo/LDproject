@@ -72,12 +72,19 @@
       </div>
     </PageSection>
 
+    <PageSection id="events" eyebrow="EVENT" title="應援活動資訊" desc="全台應援資訊整理">
+      <FeatureList :items="events" />
+      <div class="actions">
+        <router-link class="btn btn-primary" to="/events">查看應援活動</router-link>
+      </div>
+    </PageSection>
+    <!--
     <PageSection id="merch" eyebrow="LIST" title="周邊整理" desc="分類整理與連結，方便查找與比對">
       <FeatureList :items="merch" />
       <div class="actions">
         <router-link class="btn btn-primary" to="/">查看周邊整理</router-link>
       </div>
-    </PageSection>
+    </PageSection>-->
 
     <template #fixed>
       <!-- 右下角：最近生日 / 活動日期倒數 -->
