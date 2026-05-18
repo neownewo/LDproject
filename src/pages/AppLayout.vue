@@ -51,6 +51,13 @@
           <span v-show="!isMenuCollapsed" class="menu-label">{{ item.label }}</span>
         </a>
       </nav>
+
+      <div class="visitor-counter">
+        <img
+          src="https://hits.sh/l-dproject.vercel.app.svg?style=flat&label=累計瀏覽人次&color=d8b4fe&labelColor=d8b4fe"
+          alt="visitor count"
+        />
+      </div>
     </aside>
 
     <main class="content">
@@ -122,6 +129,8 @@ const isMobileMenuOpen = ref(false)
   box-shadow: 0 18px 42px rgba(31, 41, 55, 0.12);
   backdrop-filter: blur(14px);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .side-menu-header {
@@ -178,6 +187,43 @@ const isMobileMenuOpen = ref(false)
 .side-menu-nav {
   display: grid;
   gap: 8px;
+}
+
+.visitor-counter {
+  margin-top: auto;
+  padding: 18px 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.visitor-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #9b5de5;
+}
+
+.visitor-badge {
+  display: block;
+  min-width: 104px;
+  height: 26px;
+  border-radius: 999px;
+  background: #f3e8ff;
+  box-shadow: 0 8px 18px rgba(155, 93, 229, 0.18);
+}
+
+.menu-collapsed .visitor-counter {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.menu-collapsed .visitor-badge {
+  min-width: 48px;
+  max-width: 48px;
+  object-fit: cover;
+  object-position: right center;
 }
 
 .side-menu-link {
@@ -293,10 +339,22 @@ const isMobileMenuOpen = ref(false)
   }
 
   .brand-text,
-  .menu-label {
+  .menu-label,
+  .visitor-label {
     display: inline !important;
   }
+
+  .visitor-counter {
+    align-items: flex-start;
+    padding: 18px 10px 6px;
+  }
+
+  .visitor-badge {
+    min-width: 112px;
+    height: 28px;
+  }
 }
+
 .site-footer {
   margin-top: 48px;
 
@@ -314,5 +372,17 @@ const isMobileMenuOpen = ref(false)
 
 .site-footer p {
   margin: 4px 0;
+}
+
+.visitor-counter {
+  margin-top: auto;
+  padding: 18px 12px 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.visitor-counter img {
+  height: 22px;
+  opacity: 0.95;
 }
 </style>

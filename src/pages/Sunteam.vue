@@ -135,7 +135,7 @@ const sunteamSections = computed(() => {
 
   return Array.from(groupMap.values()).map((group) => ({
     ...group,
-    items: group.items.sort((a, b) => sortSunteamCard(a, b)),
+    items: group.items.sort((a, b) => a.sheetOrder - b.sheetOrder),
   }))
 })
 
@@ -150,7 +150,7 @@ onMounted(async () => {
     const data = await res.json()
     sunteams.value = data
       .filter((item) => item.level || item.title || item.summary)
-      .map(normalizeSunteam)
+      .map((item, index) => normalizeSunteam(item, index))
   } catch (error) {
     console.error(error)
     errorMessage.value = 'Sunteam 資料讀取失敗，請稍後再試。'
@@ -159,12 +159,13 @@ onMounted(async () => {
   }
 })
 
-function normalizeSunteam(item) {
+function normalizeSunteam(item, index = 0) {
   const level = String(item.level || '').trim()
   const title = String(item.title || '').trim()
   const summary = String(item.summary || '').trim()
 
   return {
+    sheetOrder: index,
     level,
     // title 欄位在你的 Sheet 目前是男主名稱，例如：沈星回 / 黎深
     title,
@@ -208,12 +209,6 @@ function getGroupDescription(level) {
   return `${name}日卡套裝整理。`
 }
 
-function sortSunteamCard(a, b) {
-  const tagA = (a.tags?.[1] || a.tags?.[0] || '').localeCompare(b.tags?.[1] || b.tags?.[0] || '', 'zh-Hant')
-  if (tagA !== 0) return tagA
-
-  return a.cardTitle.localeCompare(b.cardTitle, 'zh-Hant')
-}
 
 function slugify(value) {
   return String(value || 'other')

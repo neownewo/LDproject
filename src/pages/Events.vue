@@ -17,7 +17,7 @@
       </div>
 
       <p class="events-desc">
-        整理《戀與深空》各地應援活動，包含電視機應援、茶會與其他粉絲企劃。
+        整理《戀與深空》各地應援活動，包含電視牆應援、茶會與其他粉絲企劃。
       </p>
     </section>
 
@@ -46,9 +46,9 @@
           <span>地區</span>
           <select v-model="selectedArea">
             <option value="全部">全部</option>
-            <option value="北">北</option>
-            <option value="中">中</option>
-            <option value="南">南</option>
+            <option v-for="area in areaOptions" :key="area" :value="area">
+              {{ area }}
+            </option>
           </select>
         </label>
 
@@ -56,9 +56,9 @@
           <span>類型</span>
           <select v-model="selectedType">
             <option value="全部">全部</option>
-            <option value="電視機">電視機</option>
-            <option value="茶會">茶會</option>
-            <option value="其他">其他</option>
+            <option v-for="type in typeOptions" :key="type" :value="type">
+              {{ type }}
+            </option>
           </select>
         </label>
       </div>
@@ -82,6 +82,10 @@
 
       <div v-if="filteredEvents.length" class="events-grid">
         <article v-for="event in filteredEvents" :key="event.id" class="events-card">
+          <div v-if="event.image" class="event-image-wrap">
+            <img class="event-image" :src="event.image" :alt="event.title" loading="lazy" />
+          </div>
+
           <div class="events-meta">
             <span>{{ event.character || '未分類角色' }}</span>
             <span>{{ event.area || '未分類地區' }}</span>
@@ -97,8 +101,18 @@
             </template>
           </p>
 
-          <p v-if="event.officialAccount" class="event-info">
-            <strong>官方帳號：</strong>{{ event.officialAccount }}
+          <p v-if="event.officialName || event.officialUrl" class="event-info">
+            <strong>官方帳號：</strong>
+            <a
+              v-if="event.officialUrl"
+              class="official-link"
+              :href="event.officialUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ event.officialName || '查看官方 Threads' }}
+            </a>
+            <span v-else>{{ event.officialName }}</span>
           </p>
 
           <p v-if="event.address" class="event-info">
@@ -114,16 +128,6 @@
             loading="lazy"
             referrerpolicy="no-referrer-when-downgrade"
           ></iframe>
-
-          <a
-            v-if="event.sourceUrl"
-            class="events-link"
-            :href="event.sourceUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            查看活動原文
-          </a>
         </article>
       </div>
 
@@ -136,13 +140,13 @@
       <div class="events-toolbar">
         <div>
           <h2>應援活動統整地圖</h2>
-          <p>地圖由站長定期依照審核通過的活動資訊手動更新。</p>
+          <p>地圖由站長定期依照審核通過的活動資訊手動更新，非即時資料。</p>
         </div>
       </div>
 
       <iframe
         class="overview-map"
-        src="https://www.google.com/maps/d/u/0/embed?mid=174qvk9N4fqLfn1sgPiZKp1xbeGH0IFE&ehbc=2E312F"
+        src="https://www.google.com/maps/d/u/1/embed?mid=1XDOp0OR7O0ZU83lKrFiJOcVadFcJ0L4&ehbc=2E312F"
         loading="lazy"
         referrerpolicy="no-referrer-when-downgrade"
       ></iframe>
@@ -163,21 +167,15 @@ const loading = ref(true)
 const errorMessage = ref('')
 
 // Google Form：請改成你的活動投稿表單連結
-const GOOGLE_FORM_URL = '你的Google表單連結'
+const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScK5Zqkza9fTfL4R0oKXCV3VDhYbjs5WufqKAc936BdQkJ0sQ/viewform?usp=dialog'
 
-// Google Sheet：應援活動
-// 建議欄位：status / expired / character / title / startDate / endDate / area / type / officialAccount / address / note / sourceUrl
-const SHEET_API_URL = 'https://opensheet.elk.sh/1O8yyqv_5eoh2iltPy-nHV4KCjiTc-vjffRAFYByou0k/應援活動'
+// Google Sheet：請改成你的 opensheet API URL
+// 格式：https://opensheet.elk.sh/你的SheetID/應援活動回覆
+const SHEET_API_URL = 'https://opensheet.elk.sh/1O8yyqv_5eoh2iltPy-nHV4KCjiTc-vjffRAFYByou0k/應援活動回覆'
 
-const characterOptions = computed(() => {
-  const set = new Set(
-    events.value
-      .map((event) => event.character)
-      .filter(Boolean)
-  )
-
-  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-Hant'))
-})
+const characterOptions = computed(() => getUniqueOptions('character'))
+const areaOptions = computed(() => getUniqueOptions('area'))
+const typeOptions = computed(() => getUniqueOptions('type'))
 
 const filteredEvents = computed(() => {
   const text = keyword.value.toLowerCase()
@@ -192,7 +190,8 @@ const filteredEvents = computed(() => {
       event.character,
       event.area,
       event.type,
-      event.officialAccount,
+      event.officialName,
+      event.officialUrl,
       event.address,
       event.note,
     ]
@@ -215,10 +214,10 @@ onMounted(async () => {
 
     const data = await res.json()
     events.value = data
-      .filter((item) => normalizeStatus(item.status) === 'approved')
-      .filter((item) => !isExpired(item.expired))
+      .filter((item) => normalizeStatus(getField(item, ['status', '審核狀態'])) === 'approved')
       .map(normalizeEvent)
       .filter((item) => item.title || item.address)
+      .filter((item) => !isEventExpired(item.endDate))
       .sort(sortEvents)
   } catch (error) {
     console.error(error)
@@ -229,34 +228,88 @@ onMounted(async () => {
 })
 
 function normalizeEvent(item, index) {
+  const title = getField(item, ['應援活動名稱', 'title', '活動名稱', 'name'])
+  const character = getField(item, ['應援角色', 'character', '角色'])
+  const startDate = getField(item, ['活動開始日期', 'startDate', '開始日期'])
+  const endDate = getField(item, ['活動結束日期', 'endDate', '結束日期'])
+  const area = getField(item, ['地區分類', 'area', '地區'])
+  const type = getField(item, ['活動類型', 'type', '類型'])
+  const officialName = getField(item, ['官方帳號名稱(threads)', 'officialName', '官方帳號名稱', '官方帳號', 'officialAccount'])
+  const officialUrl = normalizeUrl(getField(item, ['官方 Threads 連結(直接貼網址)', 'officialUrl', '官方Threads連結', 'Threads連結', 'sourceUrl', 'link']))
+  const address = getField(item, ['完整地址', 'address', '活動完整地址'])
+  const note = getField(item, ['活動說明', 'note', '說明', 'summary', 'description'])
+  const image = normalizeUrl(getField(item, ['活動主視覺圖片 (圖片的URL網址)', 'image', '圖片', '圖片網址']))
+
   return {
-    id: `${item.title || item.name || 'event'}-${index}`,
-    title: String(item.title || item.name || '未命名活動').trim(),
-    character: String(item.character || item.role || '').trim(),
-    startDate: String(item.startDate || item.start || item.dateStart || '').trim(),
-    endDate: String(item.endDate || item.end || item.dateEnd || '').trim(),
-    area: String(item.area || item.region || '未分類').trim(),
-    type: String(item.type || item.category || '其他').trim(),
-    officialAccount: String(item.officialAccount || item.account || '').trim(),
-    address: String(item.address || '').trim(),
-    note: String(item.note || item.summary || item.description || '').trim(),
-    sourceUrl: String(item.sourceUrl || item.link || '').trim(),
+    id: `${title || 'event'}-${index}`,
+    title: title || '未命名活動',
+    character,
+    startDate,
+    endDate,
+    area: area || '未分類',
+    type: type || '其他',
+    officialName,
+    officialUrl,
+    address,
+    note,
+    image,
   }
 }
 
-function normalizeStatus(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
+function getField(item, names) {
+  const normalizedMap = Object.entries(item).reduce((map, [key, value]) => {
+    map[normalizeKey(key)] = value
+    return map
+  }, {})
+
+  for (const name of names) {
+    const value = normalizedMap[normalizeKey(name)]
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim()
+    }
+  }
+
+  return ''
 }
 
-function isExpired(value) {
-  const text = String(value || '').trim().toLowerCase()
-  return ['是', 'yes', 'y', 'true', '1', '已過期', '過期'].includes(text)
+function normalizeKey(value) {
+  return String(value || '').replace(/\s+/g, '').trim().toLowerCase()
+}
+
+function normalizeStatus(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function isEventExpired(endDateValue) {
+  // 不再讀取 expired 欄位，直接依「活動結束日期」判斷是否過期。
+  // 結束日期當天仍會顯示，隔天才隱藏。
+  const endDate = parseDate(endDateValue)
+
+  // 沒有填結束日期時先保留顯示，避免投稿資料因缺漏直接消失。
+  if (!endDate) return false
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  endDate.setHours(23, 59, 59, 999)
+
+  return endDate < today
+}
+
+function normalizeUrl(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (/^https?:\/\//i.test(text)) return text
+  return ''
 }
 
 function getSingleMapUrl(address) {
   return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`
+}
+
+function getUniqueOptions(field) {
+  const set = new Set(events.value.map((event) => event[field]).filter(Boolean))
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-Hant'))
 }
 
 function sortEvents(a, b) {
@@ -272,7 +325,10 @@ function sortEvents(a, b) {
 
 function parseDate(value) {
   if (!value) return null
-  const date = new Date(value)
+
+  // Google Sheet / opensheet 可能回傳 2026/4/18、2026-04-18，或 Date 字串
+  const normalized = String(value).trim().replace(/\//g, '-')
+  const date = new Date(normalized)
   return Number.isNaN(date.getTime()) ? null : date
 }
 
@@ -447,7 +503,7 @@ function formatDate(value) {
 }
 
 .events-card {
-  flex: 0 0 clamp(280px, 38vw, 380px);
+  flex: 0 0 clamp(300px, 38vw, 400px);
   display: flex;
   min-height: 300px;
   flex-direction: column;
@@ -457,6 +513,21 @@ function formatDate(value) {
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 12px 26px rgba(31, 41, 55, 0.07);
   scroll-snap-align: start;
+}
+
+.event-image-wrap {
+  overflow: hidden;
+  border-radius: 16px;
+  margin-bottom: 14px;
+  background: rgba(243, 244, 246, 0.9);
+  aspect-ratio: 16 / 9;
+}
+
+.event-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .events-meta {
@@ -499,6 +570,16 @@ function formatDate(value) {
   color: rgba(17, 24, 39, 0.86);
 }
 
+.official-link {
+  color: rgba(79, 70, 229, 0.94);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.official-link:hover {
+  text-decoration: underline;
+}
+
 .event-note {
   margin-top: 4px;
 }
@@ -510,19 +591,6 @@ function formatDate(value) {
   border-radius: 18px;
   margin-top: 12px;
   background: rgba(243, 244, 246, 0.9);
-}
-
-.events-link {
-  display: inline-flex;
-  margin-top: auto;
-  padding-top: 14px;
-  color: rgba(79, 70, 229, 0.94);
-  font-weight: 900;
-  text-decoration: none;
-}
-
-.events-link:hover {
-  text-decoration: underline;
 }
 
 .overview-map {

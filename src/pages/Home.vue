@@ -184,6 +184,12 @@ const merch = [
   { label: '分類', value: '立牌 / 徽章 / 服飾 / 娃娃 / 其他' },
   { label: '欄位', value: '名稱、類別、備註' },
 ]
+const sunteam = [
+  { label: '日卡整理', value: '屬性 / 技能 / 戰鬥技巧 / 推薦芯核搭配'  }
+]
+const events = [
+  { label: '應援活動整理', value: '名稱 / 地點 /統整地圖 / 活動時間' }
+]
 </script>
 
 <style scoped>
