@@ -54,7 +54,7 @@
 
       <div class="visitor-counter">
         <img
-          src="https://hits.sh/l-dproject.vercel.app.svg?style=flat&label=累計瀏覽人次&color=d8b4fe&labelColor=d8b4fe"
+          src="https://hits.sh/l-dproject.vercel.app.svg?style=flat&label=累計瀏覽量&color=d8b4fe&labelColor=d8b4fe"
           alt="visitor count"
         />
       </div>
