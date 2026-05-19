@@ -2,12 +2,22 @@
   <AppLayout>
     <section id="guides" class="guide-hero">
       <p class="eyebrow">GUIDE</p>
-      <h1>攻略整理</h1>
-      <p class="guide-desc">
-        整理新手入門、養成方向、重點與常用資料。
-      </p>
-    </section>
 
+      <div class="hero-title-row">
+        <h1>攻略整理</h1>
+
+        <a
+          class="submit-button"
+          :href="GOOGLE_FORM_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          攻略文章投稿
+        </a>
+      </div>
+
+      <p class="guide-desc">整理新手入門、養成方向、重點與常用資料。</p>
+    </section>
     <section id="guide-filter" class="guide-search-panel">
       <label class="search-box">
         <span>搜尋攻略</span>
@@ -47,6 +57,7 @@
             <div class="guide-meta">
               <span>{{ guide.category }}</span>
               <span v-if="guide.date">{{ guide.date }}</span>
+              <span v-if="guide.writer">✦ {{ guide.writer }}</span>
             </div>
 
             <h3>{{ guide.title }}</h3>
@@ -65,7 +76,8 @@
                   url: guide.link,
                   title: guide.title,
                   category: guide.category,
-                  date: guide.date
+                  date: guide.date,
+                  writer: guide.writer
                 }
               }"
             >
@@ -86,36 +98,99 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
+import { SITE } from '../site.config'
 import { computed, ref, onMounted } from 'vue'
 import AppLayout from './AppLayout.vue'
-import { guideGroups } from '../guideData'
+
+const sectionOrder = [
+  '新手獵人必看',
+  '中級獵人必看',
+  '高級獵人必看',
+  '休閒獵人必看',
+]
+
+function normalizeSectionName(value) {
+  const text = String(value || '').trim()
+
+  if (text.includes('新手')) return '新手獵人必看'
+  if (text.includes('中級')) return '中級獵人必看'
+  if (text.includes('高級')) return '高級獵人必看'
+  if (text.includes('休閒')) return '休閒獵人必看'
+
+  return text || '其他攻略'
+}
+
+function getSectionOrderIndex(sectionName) {
+  const normalized = normalizeSectionName(sectionName)
+  const index = sectionOrder.indexOf(normalized)
+  return index === -1 ? sectionOrder.length : index
+}
 
 const keyword = ref('')
 const guides = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
 
-const SHEET_API_URL = 'https://opensheet.elk.sh/1XWvnyr8B36KSfqCNp3rKbQzztVEMB5fEb2869eo4CeU/遊戲攻略'
+// 攻略投稿 Google 表單連結
+// 兩種名稱都支援：guideForm / guideSubmit，避免 config 命名不同造成讀不到
+const GOOGLE_FORM_URL = SITE.forms?.guideForm || SITE.forms?.guideSubmit || ''
+
+// Google Sheet：遊戲攻略投稿表單
+// 新欄位對應：
+// 類別 / 攻略標題 / 作者名稱 / 文章上傳日 / 簡介 / 關鍵字 / 文章縮圖連結固定勾選即可 / 文章連結 / status
+const SHEET_API_URL = SITE.sheets.guides
 
 const guideSections = computed(() => {
   const text = keyword.value.toLowerCase()
 
-  return guideGroups.map((group) => {
-    const items = guides.value.filter((guide) => {
-      const matchLevel = guide.level === group.level
-      const searchTarget = [guide.title, guide.summary, guide.category, ...(guide.tags || [])]
-        .join(' ')
-        .toLowerCase()
-      const matchKeyword = !text || searchTarget.includes(text)
+  const filtered = guides.value.filter((guide) => {
+    const searchTarget = [
+      guide.section,
+      guide.level,
+      guide.title,
+      guide.summary,
+      guide.category,
+      guide.date,
+      guide.writer,
+      ...(guide.tags || []),
+    ]
+      .join(' ')
+      .toLowerCase()
 
-      return matchLevel && matchKeyword
-    })
-
-    return {
-      ...group,
-      items,
-    }
+    return !text || searchTarget.includes(text)
   })
+
+  const groupMap = new Map()
+
+  filtered.forEach((guide) => {
+    const sectionName = getSectionName(guide)
+
+    if (!groupMap.has(sectionName)) {
+      groupMap.set(sectionName, {
+        id: `guide-${slugify(sectionName)}`,
+        level: sectionName,
+        title: getSectionTitle(sectionName),
+        description: getSectionDescription(sectionName),
+        items: [],
+        firstOrder: guide.sheetOrder,
+      })
+    }
+
+    groupMap.get(sectionName).items.push(guide)
+  })
+
+  return Array.from(groupMap.values())
+    .sort((a, b) => {
+      const orderDiff = getSectionOrderIndex(a.level) - getSectionOrderIndex(b.level)
+      if (orderDiff !== 0) return orderDiff
+
+      return a.firstOrder - b.firstOrder
+    })
+    .map((group) => ({
+      ...group,
+      items: group.items.sort((a, b) => a.sheetOrder - b.sheetOrder),
+    }))
 })
 
 onMounted(async () => {
@@ -127,9 +202,19 @@ onMounted(async () => {
     if (!res.ok) throw new Error(`Google Sheet 資料讀取失敗：${res.status}`)
 
     const data = await res.json()
+
     guides.value = data
-      .filter((item) => item.level || item.title)
-      .map(normalizeGuide)
+      .filter((item) => {
+        const normalized = normalizeGuide(item)
+        const hasContent = normalized.title || normalized.summary || normalized.link || normalized.route
+
+        // 有 status 欄位時，只顯示 approved；沒有 status 欄位時，先允許顯示，方便舊資料相容
+        const status = String(item.status || item.Status || item.審核狀態 || '').trim().toLowerCase()
+        const isApproved = !status || status === 'approved'
+
+        return hasContent && isApproved
+      })
+      .map((item, index) => normalizeGuide(item, index))
   } catch (error) {
     console.error(error)
     errorMessage.value = '攻略資料讀取失敗，請稍後再試。'
@@ -138,27 +223,152 @@ onMounted(async () => {
   }
 })
 
-function normalizeGuide(item) {
+function normalizeGuide(item, index = 0) {
+  const category = getField(item, [
+    '類別',
+    'category',
+    '分類',
+    'section',
+    'level',
+    '區塊',
+  ])
+
+  const title = getField(item, [
+    '攻略標題',
+    'title',
+    '標題',
+  ])
+
+  const writer = normalizeWriter(
+    getField(item, [
+      '作者名稱',
+      'writer',
+      '作者',
+      '撰寫者',
+    ])
+  )
+
+  const date = formatSheetDate(
+    getField(item, [
+      '文章上傳日',
+      'date',
+      '日期',
+      '上傳日',
+    ])
+  )
+
+  const summary = getField(item, [
+    '簡介',
+    'summary',
+    'description',
+    '摘要',
+    '說明',
+  ])
+
+  const tagText = getField(item, [
+    '關鍵字',
+    'tags',
+    'tag',
+    '標籤',
+  ])
+
+  const image = getField(item, [
+    '文章縮圖連結固定勾選即可',
+    'image',
+    '圖片',
+    '縮圖',
+    'thumbnail',
+  ])
+
+  const link = getField(item, [
+    '文章連結',
+    'link',
+    'url',
+    '連結',
+    '文章網址',
+  ])
+
   return {
-    level: String(item.level || '').trim(),
-    category: String(item.category || '').trim(),
-    date: String(item.date || '').trim(),
-    title: String(item.title || '').trim(),
-    summary: String(item.summary || '').trim(),
-    tags: parseTags(item.tags),
-    image: String(item.image || '').trim(),
-    link: String(item.link || '').trim(),
+    sheetOrder: index,
+    section: category,
+    level: category,
+    category,
+    date,
+    title,
+    writer,
+    summary,
+    tags: parseTags(tagText),
+    image,
+    link,
     route: String(item.route || '').trim(),
   }
+}
+
+function getField(item, keys = []) {
+  for (const key of keys) {
+    const value = item[key]
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim()
+    }
+  }
+
+  return ''
+}
+
+function normalizeWriter(writer) {
+  if (!writer) return ''
+  return String(writer).replace(/^@/, '').trim()
+}
+
+function formatSheetDate(value) {
+  if (!value) return ''
+
+  // Excel / Google Sheet 日期序號，例如 46158
+  if (!Number.isNaN(Number(value)) && Number(value) > 30000) {
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30))
+    const date = new Date(excelEpoch.getTime() + Number(value) * 86400000)
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`
+  }
+
+  return String(value).trim()
+}
+
+function getSectionName(guide) {
+  return normalizeSectionName(
+    guide.section ||
+    guide.level ||
+    guide.category ||
+    guide.tags?.[0] ||
+    '其他攻略'
+  )
+}
+
+function getSectionTitle(sectionName) {
+  return normalizeSectionName(sectionName)
+}
+
+function getSectionDescription(sectionName) {
+  const title = getSectionTitle(sectionName)
+  return `${title}整理。`
 }
 
 function parseTags(value) {
   if (Array.isArray(value)) return value.map((tag) => String(tag).trim()).filter(Boolean)
 
+  // 關鍵字欄位統一使用英文逗號 , 分隔
+  // 範例：抽卡,新手,五星推薦
   return String(value || '')
-    .split(/[、，,]/)
+    .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean)
+}
+
+function slugify(value) {
+  return String(value || 'other')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-\u4e00-\u9fa5]/gi, '') || 'other'
 }
 </script>
 
@@ -193,9 +403,17 @@ function parseTags(value) {
   line-height: 1.18;
 }
 
+.hero-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .guide-desc {
   max-width: 720px;
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   color: rgba(75, 85, 99, 0.9);
   line-height: 1.8;
 }
@@ -490,6 +708,11 @@ function parseTags(value) {
   .guide-toolbar {
     display: grid;
   }
+
+  .hero-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 520px) {
@@ -514,5 +737,25 @@ function parseTags(value) {
   .guide-card {
     flex-basis: min(82vw, 300px);
   }
+}
+
+.submit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.88), rgba(167, 139, 250, 0.9));
+  box-shadow: 0 10px 22px rgba(99, 102, 241, 0.18);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  text-decoration: none;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.submit-button:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
 }
 </style>

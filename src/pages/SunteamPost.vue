@@ -33,6 +33,7 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppLayout from './AppLayout.vue'

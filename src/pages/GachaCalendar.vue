@@ -189,12 +189,14 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
+import { SITE } from '../site.config'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import AppLayout from './AppLayout.vue'
 
 // 將這裡換成你的 opensheet 網址
 // 格式：https://opensheet.elk.sh/你的SheetID/工作表名稱
-const SHEET_API_URL = 'https://opensheet.elk.sh/1XWvnyr8B36KSfqCNp3rKbQzztVEMB5fEb2869eo4CeU/卡池月曆'
+const SHEET_API_URL =  SITE.sheets.gacha
 
 const loading = ref(true)
 const errorMessage = ref('')

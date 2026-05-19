@@ -78,6 +78,7 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
 import { ref } from 'vue'
 import { mainMenuItems } from '../menu.config'
 

@@ -1,12 +1,21 @@
-// src/site.config.js
+
 export const SITE = {
   title: '戀與深空攻略情報',
-  sections: [
-    { id: 'news', title: '最新消息', desc: '自動同步官方最新公告（先保留區塊）' },
-    { id: 'howto', title: '玩法介紹', desc: '整理重點並連到官方介紹頁', href: 'https://loveanddeepspace.infoldgames.com/zh-TW/home' },
-    { id: 'beginner', title: '新手指南', desc: '開局資源、每日必做、入門觀念', to: '/guides' },
-    { id: 'gacha', title: '卡池歷程整理', desc: '用行事曆視覺化每期卡池縮圖', to: '/gacha' },
-    { id: 'sunteam', title: '日卡套組介紹', desc: '各男主日卡套介紹', to: '/sunteam' },
-    { id: 'merch', title: '周邊整理', desc: '分類、整理、連結與備註', to: '/merch' },
-  ],
+
+  sheets: {
+    guides: 'https://opensheet.elk.sh/1O8yyqv_5eoh2iltPy-nHV4KCjiTc-vjffRAFYByou0k/遊戲攻略目錄',
+    sunteam: 'https://opensheet.elk.sh/1XWvnyr8B36KSfqCNp3rKbQzztVEMB5fEb2869eo4CeU/男主日卡套裝',
+    gacha: 'https://opensheet.elk.sh/1XWvnyr8B36KSfqCNp3rKbQzztVEMB5fEb2869eo4CeU/卡池月曆',
+    events:'https://opensheet.elk.sh/1O8yyqv_5eoh2iltPy-nHV4KCjiTc-vjffRAFYByou0k/應援活動回覆'
+  },
+
+  forms: {
+    guideForm: 'https://docs.google.com/forms/d/e/1FAIpQLScUHY82CLGnm2OAzbzdTGI3oFxctYJJG3moCy_lbSDnuUTGkQ/viewform?usp=pp_url&entry.1510978023=https://assets.papegames.com/resources/cdn/20250110/f3424f82a0cc3bad.jpg&entry.1075038858=pending',
+    eventForm: 'https://docs.google.com/forms/d/e/1FAIpQLScK5Zqkza9fTfL4R0oKXCV3VDhYbjs5WufqKAc936BdQkJ0sQ/viewform?usp=dialog',
+  },
+
+  maps: {
+    supportMap:
+      'https://www.google.com/maps/d/u/0/embed?mid=174qvk9N4fqLfn1sgPiZKp1xbeGH0IFE&ehbc=2E312F',
+  },
 }

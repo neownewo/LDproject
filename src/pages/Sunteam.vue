@@ -86,6 +86,8 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
+import { SITE } from '../site.config'
 import { computed, ref, onMounted } from 'vue'
 import AppLayout from './AppLayout.vue'
 
@@ -96,7 +98,7 @@ const errorMessage = ref('')
 
 // Google Sheet：男主日卡套裝
 // 欄位：level / title / summary / tags / image / link / route
-const SHEET_API_URL = 'https://opensheet.elk.sh/1XWvnyr8B36KSfqCNp3rKbQzztVEMB5fEb2869eo4CeU/男主日卡套裝'
+const SHEET_API_URL =  SITE.sheets.sunteam
 
 const sunteamSections = computed(() => {
   const text = keyword.value.toLowerCase()

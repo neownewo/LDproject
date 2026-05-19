@@ -10,18 +10,32 @@
         <div class="post-meta">
           <span v-if="category">{{ category }}</span>
           <span v-if="date">{{ date }}</span>
+
           <a v-if="articleUrl" :href="articleUrl" target="_blank" rel="noopener noreferrer">
             另開文章
+          </a>
+
+          <a
+            v-if="writer"
+            :href="writerThreadsUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="writer-link"
+          >
+            作者：{{ writerDisplayName }}
           </a>
         </div>
       </div>
 
-      <div v-if="embedUrl" class="notion-frame-card">
+      <div v-if="embedUrl" class="embed-frame-card" :class="`${embedType}-frame-card`">
         <iframe
           :src="embedUrl"
-          class="notion-frame"
+          class="embed-frame"
+          :class="`${embedType}-frame`"
           frameborder="0"
-          allowfullscreen
+          allowfullscreen="true"
+          mozallowfullscreen="true"
+          webkitallowfullscreen="true"
         ></iframe>
       </div>
 
@@ -33,6 +47,7 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppLayout from './AppLayout.vue'
@@ -42,29 +57,165 @@ const router = useRouter()
 
 // 從 Guides.vue 傳進來：/guide-post?title=xxx&link=Notion網址
 const articleUrl = computed(() => {
-  const url = route.query.url || route.query.link || ''
+  // 文章嵌入來源只能抓「文章連結」
+  // 避免誤抓「文章縮圖連結固定勾選即可」
+  const url =
+    route.query['文章連結'] ||
+    route.query.articleUrl ||
+    route.query.contentUrl ||
+    route.query.link ||
+    route.query.url ||
+    ''
+
   return typeof url === 'string' ? url.trim() : ''
 })
 
 const articleTitle = computed(() => {
-  const title = route.query.title || route.params.slug || '攻略文章'
+  const title =
+    route.query.title ||
+    route.query['攻略標題'] ||
+    route.params.slug ||
+    '攻略文章'
+
   return typeof title === 'string' ? title : '攻略文章'
 })
 
 const category = computed(() => {
-  const value = route.query.category || ''
+  const value =
+    route.query.category ||
+    route.query['類別'] ||
+    ''
+
   return typeof value === 'string' ? value : ''
 })
 
 const date = computed(() => {
-  const value = route.query.date || ''
+  const value =
+    route.query.date ||
+    route.query['文章上傳日'] ||
+    ''
+
   return typeof value === 'string' ? value : ''
 })
 
-// 支援兩種 Google Sheet link 寫法：
-// 1. 直接填 Notion embed URL：https://xxx.notion.site/ebd/pageId
-// 2. 填一般 Notion URL：https://xxx.notion.site/page-title-pageId 或 https://www.notion.so/pageId
-const embedUrl = computed(() => buildNotionEmbedUrl(articleUrl.value))
+const writer = computed(() => {
+  const value =
+    route.query.writer ||
+    route.query['作者名稱'] ||
+    route.query.author ||
+    ''
+
+  return typeof value === 'string' ? value.trim() : ''
+})
+
+const writerDisplayName = computed(() => {
+  if (!writer.value) return ''
+  return writer.value.startsWith('@') ? writer.value : `@${writer.value}`
+})
+
+const writerThreadsUrl = computed(() => getWriterThreadsUrl(writer.value))
+
+// 支援 Google Sheet 直接填：
+// 1. Notion 一般網址 / Notion embed 網址
+// 2. Google Slides 一般分享網址 / 發佈到網路網址 / iframe embed 程式碼
+const embedData = computed(() => buildEmbedData(articleUrl.value))
+const embedUrl = computed(() => embedData.value.url)
+const embedType = computed(() => embedData.value.type || 'notion')
+
+function buildEmbedData(rawValue) {
+  const url = extractUrlFromInput(rawValue)
+  if (!url) return { type: '', url: '' }
+
+  if (isGoogleSlidesUrl(url)) {
+    return {
+      type: 'slides',
+      url: buildGoogleSlidesEmbedUrl(url)
+    }
+  }
+
+  return {
+    type: 'notion',
+    url: buildNotionEmbedUrl(url)
+  }
+}
+
+function getWriterThreadsUrl(writer) {
+  if (!writer) return '#'
+
+  const value = String(writer).trim()
+
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value
+  }
+
+  const cleanWriter = value.replace('@', '').trim()
+
+  return `https://www.threads.net/@${cleanWriter}`
+}
+
+function extractUrlFromInput(value) {
+  if (!value) return ''
+
+  const text = String(value).trim()
+
+  // 如果 Sheet 裡直接貼 Google iframe embed code，就自動抓 src
+  const iframeSrcMatch = text.match(/<iframe[^>]*\ssrc=["']([^"']+)["'][^>]*>/i)
+  if (iframeSrcMatch?.[1]) {
+    return iframeSrcMatch[1].trim()
+  }
+
+  return text
+}
+
+function isGoogleSlidesUrl(url) {
+  return /docs\.google\.com\/presentation\//i.test(url)
+}
+
+function isNotionUrl(url) {
+  return /notion\.site|notion\.so/i.test(url)
+}
+
+function buildGoogleSlidesEmbedUrl(url) {
+  try {
+    const parsed = new URL(url)
+
+    // 已經是可嵌入網址，直接補上常用參數後回傳
+    if (parsed.pathname.includes('/embed') || parsed.pathname.includes('/pubembed')) {
+      if (!parsed.searchParams.has('start')) parsed.searchParams.set('start', 'false')
+      if (!parsed.searchParams.has('loop')) parsed.searchParams.set('loop', 'false')
+      if (!parsed.searchParams.has('delayms')) parsed.searchParams.set('delayms', '5000')
+      return parsed.toString()
+    }
+
+    // 發佈到網路的 /pub 或 /pubhtml 轉 /pubembed
+    if (parsed.pathname.includes('/pub') || parsed.pathname.includes('/pubhtml')) {
+      parsed.pathname = parsed.pathname
+        .replace('/pubhtml', '/pubembed')
+        .replace('/pub', '/pubembed')
+      parsed.searchParams.set('start', parsed.searchParams.get('start') || 'false')
+      parsed.searchParams.set('loop', parsed.searchParams.get('loop') || 'false')
+      parsed.searchParams.set('delayms', parsed.searchParams.get('delayms') || '5000')
+      return parsed.toString()
+    }
+
+    // 一般分享網址：https://docs.google.com/presentation/d/{id}/edit
+    const normalIdMatch = parsed.pathname.match(/\/presentation\/d\/([^/]+)/)
+    if (normalIdMatch?.[1]) {
+      return `https://docs.google.com/presentation/d/${normalIdMatch[1]}/embed?start=false&loop=false&delayms=5000`
+    }
+
+    // 發佈網址：https://docs.google.com/presentation/d/e/{id}/...
+    const publishIdMatch = parsed.pathname.match(/\/presentation\/d\/e\/([^/]+)/)
+    if (publishIdMatch?.[1]) {
+      return `https://docs.google.com/presentation/d/e/${publishIdMatch[1]}/pubembed?start=false&loop=false&delayms=5000`
+    }
+
+    return url
+  } catch (error) {
+    console.warn('Google Slides link 格式無法轉換：', url, error)
+    return url
+  }
+}
 
 function buildNotionEmbedUrl(url) {
   if (!url) return ''
@@ -122,7 +273,7 @@ function goBack() {
 }
 
 .post-header,
-.notion-frame-card,
+.embed-frame-card,
 .empty-state {
   border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: 24px;
@@ -190,18 +341,24 @@ function goBack() {
   color: rgba(79, 70, 229, 0.94);
 }
 
-.notion-frame-card {
+.embed-frame-card {
   overflow: hidden;
   padding: 0;
 }
 
-.notion-frame {
+.embed-frame {
   display: block;
   width: 100%;
   min-height: 76vh;
   border: 0;
   border-radius: 24px;
   background: #fff;
+}
+
+.slides-frame {
+  aspect-ratio: 16 / 9;
+  min-height: auto;
+  height: auto;
 }
 
 .empty-state {
@@ -217,13 +374,27 @@ function goBack() {
     padding: 18px;
   }
 
-  .notion-frame-card,
+  .embed-frame-card,
   .notion-frame {
     border-radius: 18px;
   }
 
-  .notion-frame {
+  .embed-frame {
     min-height: 72vh;
   }
+
+  .slides-frame {
+    min-height: auto;
+  }
+}
+
+.writer-link {
+  color: #8b5cf6;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.writer-link:hover {
+  text-decoration: underline;
 }
 </style>

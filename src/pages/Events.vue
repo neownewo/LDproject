@@ -155,6 +155,8 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
+import { SITE } from '../site.config'
 import { computed, onMounted, ref } from 'vue'
 import AppLayout from './AppLayout.vue'
 
@@ -167,11 +169,11 @@ const loading = ref(true)
 const errorMessage = ref('')
 
 // Google Form：請改成你的活動投稿表單連結
-const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScK5Zqkza9fTfL4R0oKXCV3VDhYbjs5WufqKAc936BdQkJ0sQ/viewform?usp=dialog'
+const GOOGLE_FORM_URL =  SITE.forms.eventForm
 
 // Google Sheet：請改成你的 opensheet API URL
 // 格式：https://opensheet.elk.sh/你的SheetID/應援活動回覆
-const SHEET_API_URL = 'https://opensheet.elk.sh/1O8yyqv_5eoh2iltPy-nHV4KCjiTc-vjffRAFYByou0k/應援活動回覆'
+const SHEET_API_URL = SITE.sheets.events
 
 const characterOptions = computed(() => getUniqueOptions('character'))
 const areaOptions = computed(() => getUniqueOptions('area'))

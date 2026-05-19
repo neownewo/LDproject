@@ -101,6 +101,7 @@
 </template>
 
 <script setup>
+import '../styles/common.css'
 import { computed } from 'vue'
 import AppLayout from './AppLayout.vue'
 import HeroBanner from '../components/HeroBanner.vue'
