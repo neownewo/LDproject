@@ -48,7 +48,7 @@
 
 <script setup>
 import '../styles/common.css'
-import { computed } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppLayout from './AppLayout.vue'
 
@@ -121,6 +121,55 @@ const writerThreadsUrl = computed(() => getWriterThreadsUrl(writer.value))
 const embedData = computed(() => buildEmbedData(articleUrl.value))
 const embedUrl = computed(() => embedData.value.url)
 const embedType = computed(() => embedData.value.type || 'notion')
+
+const iframeLoaded = ref(false)
+const iframeFailed = ref(false)
+let notionLoadTimer = null
+
+const isNotionEmbed = computed(() => embedType.value === 'notion')
+const shouldShowIframe = computed(() => !isNotionEmbed.value || !iframeFailed.value)
+const showEmbedFallback = computed(() => isNotionEmbed.value && iframeFailed.value)
+
+function handleIframeLoad() {
+  iframeLoaded.value = true
+
+  if (notionLoadTimer) {
+    clearTimeout(notionLoadTimer)
+    notionLoadTimer = null
+  }
+}
+
+function startNotionLoadTimer() {
+  iframeLoaded.value = false
+  iframeFailed.value = false
+
+  if (notionLoadTimer) {
+    clearTimeout(notionLoadTimer)
+    notionLoadTimer = null
+  }
+
+  if (!isNotionEmbed.value || !embedUrl.value) return
+
+  notionLoadTimer = setTimeout(() => {
+    if (!iframeLoaded.value) {
+      iframeFailed.value = true
+    }
+  }, 8000)
+}
+
+onMounted(() => {
+  startNotionLoadTimer()
+})
+
+watch([embedUrl, embedType], () => {
+  startNotionLoadTimer()
+})
+
+onBeforeUnmount(() => {
+  if (notionLoadTimer) {
+    clearTimeout(notionLoadTimer)
+  }
+})
 
 function buildEmbedData(rawValue) {
   const url = extractUrlFromInput(rawValue)
@@ -397,4 +446,17 @@ function goBack() {
 .writer-link:hover {
   text-decoration: underline;
 }
+
+.embed-fallback-card {
+  margin: 24px 0;
+  padding: 28px 22px;
+  border-radius: 20px;
+  background: #faf5ff;
+  border: 1px solid #d8b4fe;
+  color: #6b21a8;
+  text-align: center;
+  line-height: 1.8;
+  font-weight: 700;
+}
+
 </style>
