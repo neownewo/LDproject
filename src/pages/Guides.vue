@@ -73,6 +73,7 @@
               :to="{
                 path: '/guide-post',
                 query: {
+                  articleUrl: guide.link,
                   url: guide.link,
                   title: guide.title,
                   category: guide.category,

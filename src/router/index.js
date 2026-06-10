@@ -6,8 +6,8 @@ import GuidePost from '../pages/GuidePost.vue'
 import Gacha from '../pages/GachaCalendar.vue'
 import Sun from '../pages/Sunteam.vue'
 import SunPost from '../pages/SunteamPost.vue'
-import Merch from '../pages/Home.vue'
 import Events from '../pages/Events.vue'
+
 
 const routes = [
   { path: '/', component: Home },
@@ -16,7 +16,7 @@ const routes = [
   { path: '/gacha', component: Gacha },
   { path: '/sunteam', component: Sun },
   {path: '/sunteam-post',component: SunPost},
-  { path: '/merch', component: Merch },
+ 
   { path: '/events', component: Events },
 
 ]

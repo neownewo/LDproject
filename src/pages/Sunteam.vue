@@ -196,7 +196,7 @@ function parseTags(value) {
 
 function getGroupTitle(level, firstItem) {
   const nameMap = {
-    Aster: '沈星回',
+    Xavier: '沈星回',
     Zayne: '黎深',
     Rafayel: '祁煜',
     Sylus: '秦徹',

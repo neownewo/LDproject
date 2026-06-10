@@ -21,7 +21,7 @@
         </a>
         <router-link class="btn btn-primary" to="/guides">遊戲攻略</router-link>
         <router-link class="btn" to="/gacha">卡池行事曆</router-link>
-        <!--<router-link class="btn" to="/merch">周邊整理</router-link>-->
+        <router-link class="btn" to="/">周邊整理</router-link>
       </template>
       </HeroBanner>
     </section>
@@ -78,13 +78,15 @@
         <router-link class="btn btn-primary" to="/events">查看應援活動</router-link>
       </div>
     </PageSection>
-    <!--
-    <PageSection id="merch" eyebrow="LIST" title="周邊整理" desc="分類整理與連結，方便查找與比對">
+    
+     <PageSection id="merch" eyebrow="LIST" title="周邊整理" desc="戀與深空wiki資料">
       <FeatureList :items="merch" />
       <div class="actions">
-        <router-link class="btn btn-primary" to="/">查看周邊整理</router-link>
+        <a  class="btn btn-primary" href="https://wiki.biligame.com/lysk/%E7%A5%81%E7%85%9C:%E5%91%A8%E8%BE%B9"  target="_blank" rel="noopener noreferrer">
+          周邊整理
+        </a>
       </div>
-    </PageSection>-->
+    </PageSection>
 
     <template #fixed>
       <!-- 右下角：最近生日 / 活動日期倒數 -->
@@ -182,8 +184,8 @@ const gacha = [
   //{ label: '資料維護', value: '用 JSON 新增每期卡池，不用改程式' },
 ]
 const merch = [
-  { label: '分類', value: '立牌 / 徽章 / 服飾 / 娃娃 / 其他' },
-  { label: '欄位', value: '名稱、類別、備註' },
+  //{ label: '分類', value: '立牌 / 徽章 / 服飾 / 娃娃 / 其他' },
+  //{ label: '欄位', value: '名稱、類別、備註' },
 ]
 const sunteam = [
   { label: '日卡整理', value: '屬性 / 技能 / 戰鬥技巧 / 推薦芯核搭配'  }

@@ -27,8 +27,13 @@
         </div>
       </div>
 
-      <div v-if="embedUrl" class="embed-frame-card" :class="`${embedType}-frame-card`">
+      <div
+        v-if="embedUrl && shouldShowIframe"
+        class="embed-frame-card"
+        :class="`${embedType}-frame-card`"
+      >
         <iframe
+          :key="embedUrl"
           :src="embedUrl"
           class="embed-frame"
           :class="`${embedType}-frame`"
@@ -36,7 +41,13 @@
           allowfullscreen="true"
           mozallowfullscreen="true"
           webkitallowfullscreen="true"
+          loading="lazy"
+          @load="handleIframeLoad"
         ></iframe>
+      </div>
+
+      <div v-else-if="embedUrl && showEmbedFallback" class="embed-fallback-card">
+        <p>您所使用的瀏覽器不支援嵌入畫面，請點上方「另開文章」閱讀</p>
       </div>
 
       <div v-else class="empty-state">
@@ -154,7 +165,7 @@ function startNotionLoadTimer() {
     if (!iframeLoaded.value) {
       iframeFailed.value = true
     }
-  }, 8000)
+  }, 5000)
 }
 
 onMounted(() => {
