@@ -21,7 +21,6 @@
         </a>
         <router-link class="btn btn-primary" to="/guides">遊戲攻略</router-link>
         <router-link class="btn" to="/gacha">卡池行事曆</router-link>
-        <router-link class="btn" to="/">周邊整理</router-link>
       </template>
       </HeroBanner>
     </section>
