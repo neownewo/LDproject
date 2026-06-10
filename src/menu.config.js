@@ -11,5 +11,5 @@ export const mainMenuItems = [
 
   { label: '應援活動資訊', href: '/events', icon: '🧡' },
 
-  { label: '周邊整理', href: 'https://wiki.biligame.com/lysk/%E7%A5%81%E7%85%9C:%E5%91%A8%E8%BE%B9', icon: '🎁' },
+  { label: '周邊整理(戀與深空wiki資料)', href: 'https://wiki.biligame.com/lysk/%E7%A5%81%E7%85%9C:%E5%91%A8%E8%BE%B9', icon: '🎁' },
 ]
