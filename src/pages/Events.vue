@@ -12,7 +12,7 @@
           target="_blank"
           rel="noopener noreferrer"
         >
-          應援活動投稿
+          點此投稿應援活動資訊
         </a>
       </div>
 

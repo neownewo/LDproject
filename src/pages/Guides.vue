@@ -12,7 +12,7 @@
           target="_blank"
           rel="noopener noreferrer"
         >
-          攻略文章投稿
+          點此投稿攻略文章投稿
         </a>
       </div>
 
