@@ -201,6 +201,7 @@ function getGroupTitle(level, firstItem) {
     Rafayel: '祁煜',
     Sylus: '秦徹',
     Caleb: '夏以晝',
+    Valko:'敖尹'
   }
 
   return nameMap[level] || firstItem?.title || level || '其他'
