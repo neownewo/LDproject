@@ -4,7 +4,7 @@
     <section id="hero">
       <HeroBanner
         :title="SITE.title"
-        desc="本攻略網站皆為個人蒐集資料開發架設，若有任何問題請先聯繫我的脆處理"
+        desc="若小狼正式回歸，會再更新...."
       >
       <template #actions>
         <a
