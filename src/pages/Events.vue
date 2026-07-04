@@ -76,7 +76,7 @@
       <div class="events-toolbar">
         <div>
           <h2>活動列表</h2>
-          <p>僅顯示已審核通過、尚未過期的應援活動。</p>
+          <p>僅顯示尚未過期的應援活動。</p>
         </div>
       </div>
 
@@ -135,7 +135,7 @@
         目前沒有符合條件的活動，可以換個關鍵字或篩選條件試試。
       </div>
     </section>
-
+<!--
     <section class="events-panel map-panel">
       <div class="events-toolbar">
         <div>
@@ -150,7 +150,7 @@
         loading="lazy"
         referrerpolicy="no-referrer-when-downgrade"
       ></iframe>
-    </section>
+    </section>-->
   </AppLayout>
 </template>
 

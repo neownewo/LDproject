@@ -11,7 +11,7 @@ export const SITE = {
 
   forms: {
     guideForm: 'https://docs.google.com/forms/d/e/1FAIpQLScUHY82CLGnm2OAzbzdTGI3oFxctYJJG3moCy_lbSDnuUTGkQ/viewform?usp=pp_url&entry.1510978023=https://assets.papegames.com/resources/cdn/20250110/f3424f82a0cc3bad.jpg&entry.1075038858=pending',
-    eventForm: 'https://docs.google.com/forms/d/e/1FAIpQLScK5Zqkza9fTfL4R0oKXCV3VDhYbjs5WufqKAc936BdQkJ0sQ/viewform?usp=dialog',
+    eventForm: 'https://docs.google.com/forms/d/e/1FAIpQLScK5Zqkza9fTfL4R0oKXCV3VDhYbjs5WufqKAc936BdQkJ0sQ/viewform?usp=pp_url&entry.886627689=approved',
   },
 
   maps: {
