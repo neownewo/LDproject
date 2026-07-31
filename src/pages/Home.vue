@@ -4,7 +4,7 @@
     <section id="hero">
       <HeroBanner
         :title="SITE.title"
-        desc="本人非敖推，但討厭因為吵吵鬧鬧就改變公司決策的結果，所以我支持敖尹回來¯\_(ツ)_/¯"
+        desc="耶比～ 第一次投稿深空徵集被選上了 開心(*´꒳`*)"
       >
       <template #actions>
         <a
