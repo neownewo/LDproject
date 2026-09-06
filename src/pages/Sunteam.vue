@@ -90,6 +90,7 @@ import '../styles/common.css'
 import { SITE } from '../site.config'
 import { computed, ref, onMounted } from 'vue'
 import AppLayout from './AppLayout.vue'
+import { fetchSheetRows } from '../services/sheetService'
 
 const keyword = ref('')
 const sunteams = ref([])
@@ -146,10 +147,7 @@ onMounted(async () => {
     loading.value = true
     errorMessage.value = ''
 
-    const res = await fetch(SHEET_API_URL)
-    if (!res.ok) throw new Error(`Google Sheet 資料讀取失敗：${res.status}`)
-
-    const data = await res.json()
+    const data = await fetchSheetRows(SHEET_API_URL)
     sunteams.value = data
       .filter((item) => item.level || item.title || item.summary)
       .map((item, index) => normalizeSunteam(item, index))

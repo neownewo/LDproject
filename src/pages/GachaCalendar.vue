@@ -35,10 +35,9 @@
         <span>卡池類型</span>
         <select v-model="selectedType">
           <option value="all">全部</option>
-          <option value="single">單人卡池</option>
-          <option value="multi">多人卡池</option>
-          <option value="daily">日卡池</option>
-          <option value="free">免費五星</option>
+          <option v-for="type in poolTypes" :key="type.value" :value="type.value">
+            {{ type.label }}
+          </option>
         </select>
       </label>
 
@@ -83,19 +82,19 @@
         </div>
         <div class="summary-card">
           <span>單人卡池</span>
-          <strong>{{ singlePoolsCount }}</strong>
+          <strong>{{ poolCounts.single }}</strong>
         </div>
         <div class="summary-card">
           <span>多人卡池</span>
-          <strong>{{ multiPoolsCount }}</strong>
+          <strong>{{ poolCounts.multi }}</strong>
         </div>
         <div class="summary-card">
           <span>日卡池</span>
-          <strong>{{ dailyPoolsCount }}</strong>
+          <strong>{{ poolCounts.daily }}</strong>
         </div>
         <div class="summary-card">
           <span>免費五星</span>
-          <strong>{{ freeStarPoolsCount }}</strong>
+          <strong>{{ poolCounts.free }}</strong>
         </div>
       </section>
 
@@ -123,11 +122,11 @@
               <article
                 v-for="pool in group.pools"
                 :key="`${pool.name}-${pool.startDate}-${pool.endDate}`"
-                :class="['pool-card', { overlapping: pool.hasOverlap, rerun: pool.isRerun, 'free-star': pool.isFreeStar }]"
+                :class="['pool-card', { overlapping: pool.hasOverlap, rerun: pool.isRerun, 'free-star': pool.poolType === 'free' }]"
               >
                 <div class="pool-main">
                   <div class="pool-thumb-area">
-                    <template v-if="getPoolImages(pool.image).length">
+                    <template v-if="pool.images.length">
                       <img
                         class="pool-thumb"
                         :src="getCarouselImage(pool)"
@@ -135,11 +134,11 @@
                         loading="lazy"
                       />
 
-                      <div v-if="getPoolImages(pool.image).length > 1" class="carousel-dots">
+                      <div v-if="pool.images.length > 1" class="carousel-dots">
                         <span
-                          v-for="(_, index) in getPoolImages(pool.image)"
+                          v-for="(_, index) in pool.images"
                           :key="index"
-                          :class="{ active: index === getActiveCarouselIndex(pool.image) }"
+                          :class="{ active: index === getActiveCarouselIndex(pool) }"
                         ></span>
                       </div>
                     </template>
@@ -190,13 +189,22 @@
 
 <script setup>
 import '../styles/common.css'
-import { SITE } from '../site.config'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import AppLayout from './AppLayout.vue'
-
-// 將這裡換成你的 opensheet 網址
-// 格式：https://opensheet.elk.sh/你的SheetID/工作表名稱
-const SHEET_API_URL =  SITE.sheets.gacha
+import { MONTHS, POOL_TYPES } from '../constants/gacha'
+import { fetchGachaPools } from '../services/gachaService'
+import {
+  comparePools,
+  formatRange,
+  getActiveMonths,
+  getDisplayDate,
+  getYearsCovered,
+  groupPoolsByDisplayDate,
+  isOverlapping,
+  isPoolActiveInYear,
+  pad,
+  toTime,
+} from '../utils/gachaDate'
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -211,104 +219,69 @@ const hideFreeStar = ref(false)
 const carouselIndex = ref(0)
 let carouselTimer = null
 
-const months = [
-  { value: 1, label: '一月' },
-  { value: 2, label: '二月' },
-  { value: 3, label: '三月' },
-  { value: 4, label: '四月' },
-  { value: 5, label: '五月' },
-  { value: 6, label: '六月' },
-  { value: 7, label: '七月' },
-  { value: 8, label: '八月' },
-  { value: 9, label: '九月' },
-  { value: 10, label: '十月' },
-  { value: 11, label: '十一月' },
-  { value: 12, label: '十二月' },
-]
+const months = MONTHS
+const poolTypes = POOL_TYPES
 
 const yearOptions = computed(() => {
   const years = gachaPools.value.flatMap((pool) =>
-    getYearsCovered(pool.startDate, pool.endDate, pool.year)
+    getYearsCovered(pool.startDate, pool.endDate, pool.legacyYear),
   )
-
   const currentYear = new Date().getFullYear()
   return [...new Set([...years, currentYear])].sort((a, b) => b - a)
 })
 
-const yearlyPools = computed(() => {
-  return gachaPools.value
+const yearlyPools = computed(() =>
+  gachaPools.value
     .filter((pool) => isPoolActiveInYear(pool, selectedYear.value))
-    .sort(comparePools)
-})
+    .sort(comparePools),
+)
 
 const characterOptions = computed(() => {
-  const characters = yearlyPools.value.flatMap((pool) => pool.characters || [])
+  const characters = yearlyPools.value.flatMap((pool) => pool.characters)
   return [...new Set(characters)].sort((a, b) => a.localeCompare(b, 'zh-Hant'))
 })
 
-const filteredPools = computed(() => {
-  return yearlyPools.value.filter((pool) => {
-    const matchType = selectedType.value === 'all' || pool.poolType === selectedType.value
-    const matchCharacter =
-      selectedCharacter.value === 'all' || pool.characters.includes(selectedCharacter.value)
-    const matchDateRange = isInSelectedDateRange(pool)
-    const matchRerun = showRerun.value || !pool.isRerun
-    const matchFreeStar = !hideFreeStar.value || pool.poolType !== 'free'
+const filteredPools = computed(() => yearlyPools.value.filter((pool) => {
+  const matchType = selectedType.value === 'all' || pool.poolType === selectedType.value
+  const matchCharacter = selectedCharacter.value === 'all' || pool.characters.includes(selectedCharacter.value)
+  const matchRerun = showRerun.value || !pool.isRerun
+  const matchFreeStar = !hideFreeStar.value || pool.poolType !== 'free'
+  return matchType && matchCharacter && isInSelectedDateRange(pool) && matchRerun && matchFreeStar
+}))
 
-    return matchType && matchCharacter && matchDateRange && matchRerun && matchFreeStar
-  })
-})
-
-const singlePoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'single').length)
-const multiPoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'multi').length)
-const dailyPoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'daily').length)
-const freeStarPoolsCount = computed(() => filteredPools.value.filter((pool) => pool.poolType === 'free').length)
+const poolCounts = computed(() => filteredPools.value.reduce(
+  (counts, pool) => {
+    if (counts[pool.poolType] !== undefined) counts[pool.poolType] += 1
+    return counts
+  },
+  { single: 0, multi: 0, daily: 0, free: 0 },
+))
 
 const poolsByMonth = computed(() => {
-  const result = months.reduce((acc, month) => {
-    acc[month.value] = []
-    return acc
-  }, {})
+  const result = Object.fromEntries(months.map(({ value }) => [value, []]))
 
   filteredPools.value.forEach((pool) => {
-    const activeMonths = getActiveMonths(pool.startDate, pool.endDate, selectedYear.value)
-    activeMonths.forEach((month) => {
+    getActiveMonths(pool.startDate, pool.endDate, selectedYear.value).forEach((month) => {
       result[month]?.push(pool)
     })
   })
 
   Object.keys(result).forEach((monthKey) => {
     const month = Number(monthKey)
-    const markedPools = markOverlaps(result[month].sort((a, b) => comparePoolsByDisplayDate(a, b, month)))
-    result[month] = groupPoolsByDisplayDate(markedPools, month)
+    const sorted = result[month].sort((a, b) => comparePoolsByDisplayDate(a, b, month))
+    result[month] = groupPoolsByDisplayDate(markOverlaps(sorted), month, selectedYear.value)
   })
 
   return result
 })
 
-function getMonthPoolCount(monthValue) {
-  return (poolsByMonth.value[monthValue] || []).reduce((sum, group) => sum + group.pools.length, 0)
-}
-
 onMounted(async () => {
+  startCarouselTimer()
   try {
     loading.value = true
     errorMessage.value = ''
-
-    startCarouselTimer()
-
-    const res = await fetch(SHEET_API_URL)
-    if (!res.ok) throw new Error(`Google Sheet 資料讀取失敗：${res.status}`)
-
-    const data = await res.json()
-    gachaPools.value = data
-      .filter((item) => item['卡池名稱'] || item.name)
-      .map(normalizePool)
-      .filter((pool) => pool.name && pool.startDate)
-
-    if (yearOptions.value.length) {
-      selectedYear.value = yearOptions.value[0]
-    }
+    gachaPools.value = await fetchGachaPools()
+    if (yearOptions.value.length) selectedYear.value = yearOptions.value[0]
   } catch (error) {
     console.error(error)
     errorMessage.value = '卡池資料讀取失敗，請確認 Google Sheet 是否公開，或 opensheet 網址是否正確。'
@@ -318,236 +291,48 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (carouselTimer) {
-    window.clearInterval(carouselTimer)
-  }
+  if (carouselTimer) window.clearInterval(carouselTimer)
 })
 
 function startCarouselTimer() {
   if (carouselTimer) return
-
-  carouselTimer = window.setInterval(() => {
-    carouselIndex.value += 1
-  }, 2800)
+  carouselTimer = window.setInterval(() => { carouselIndex.value += 1 }, 2800)
 }
 
-function getPoolImages(imageText) {
-  return String(imageText || '')
-    .split('|')
-    .map((url) => url.trim())
-    .filter(Boolean)
-}
-
-function getActiveCarouselIndex(imageText) {
-  const images = getPoolImages(imageText)
-  if (!images.length) return 0
-  return carouselIndex.value % images.length
+function getActiveCarouselIndex(pool) {
+  return pool.images.length ? carouselIndex.value % pool.images.length : 0
 }
 
 function getCarouselImage(pool) {
-  const images = getPoolImages(pool.image)
-  if (!images.length) return ''
-  return images[getActiveCarouselIndex(pool.image)]
-}
-
-function normalizePool(item) {
-  const name = readField(item, ['卡池名稱', 'name'])
-  const year = readField(item, ['卡池年份', 'year'])
-  const startDate = normalizeDate(readField(item, ['卡池起始日', 'startDate', 'start_date']))
-  const endDate = normalizeDate(readField(item, ['結束日', '卡池結束日', 'endDate', 'end_date'])) || startDate
-  const image = readField(item, ['卡池縮圖連結', '縮圖連結', 'image', 'thumbnail'])
-  const characters = parseList(readField(item, ['角色', '登場角色', 'characters']))
-  const note = readField(item, ['備註', 'note'])
-  const isRerun = parseBoolean(readField(item, ['是否為復刻', '復刻', 'isRerun', 'rerun']))
-  const poolTypeRaw = readField(item, ['卡池類型', 'type', 'poolType'])
-  const poolTypeFromSheet = poolTypeRaw.toLowerCase()
-
-  let poolType = 'single'
-
-  if (poolTypeFromSheet.includes('免費') || poolTypeFromSheet.includes('free')) {
-    poolType = 'free'
-  } else if (poolTypeFromSheet.includes('daily') || poolTypeFromSheet.includes('日卡')) {
-    poolType = 'daily'
-  } else if (
-    poolTypeFromSheet.includes('multi') ||
-    poolTypeFromSheet.includes('多人') ||
-    characters.length > 1
-  ) {
-    poolType = 'multi'
-  }
-
-  return {
-    name,
-    year,
-    startDate,
-    endDate,
-    image,
-    characters,
-    note,
-    isRerun,
-    isFreeStar: poolType === 'free',
-    poolType,
-    typeLabel: getTypeLabel(poolType),
-    hasOverlap: false,
-  }
-}
-
-function readField(item, keys) {
-  for (const key of keys) {
-    if (item[key] !== undefined && item[key] !== null && String(item[key]).trim() !== '') {
-      return String(item[key]).trim()
-    }
-  }
-  return ''
-}
-
-function normalizeDate(value) {
-  if (!value) return ''
-
-  const text = String(value).trim().replaceAll('/', '-')
-
-  // 支援 Google Sheet / Excel 日期序號，例如 45377
-  if (/^\d+(\.\d+)?$/.test(text)) {
-    const serial = Number(text)
-    if (serial > 30000 && serial < 70000) {
-      const utcDays = Math.floor(serial - 25569)
-      const date = new Date(utcDays * 86400 * 1000)
-      return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
-    }
-  }
-
-  const parts = text.split('-')
-
-  if (parts.length === 3) {
-    const [year, month, day] = parts
-    return `${year}-${pad(month)}-${pad(day)}`
-  }
-
-  return text
-}
-
-function parseList(value) {
-  return String(value || '')
-    .split(/[、，,\/／|]/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-function parseBoolean(value) {
-  const text = String(value || '').trim().toLowerCase()
-  return ['true', 'yes', 'y', '1', '是', '有', '顯示', '復刻', '免費5星'].includes(text)
-}
-
-function getTypeLabel(poolType) {
-  const labels = {
-    single: '單人卡池',
-    multi: '多人卡池',
-    daily: '日卡池',
-    free: '免費五星',
-  }
-
-  return labels[poolType] || '單人卡池'
+  return pool.images[getActiveCarouselIndex(pool)] || ''
 }
 
 function isInSelectedDateRange(pool) {
   if (!filterStartDate.value && !filterEndDate.value) return true
-
   const poolStart = toTime(pool.startDate)
   const poolEnd = toTime(pool.endDate || pool.startDate)
   const queryStart = filterStartDate.value ? toTime(filterStartDate.value) : -Infinity
   const queryEnd = filterEndDate.value ? toTime(filterEndDate.value) : Infinity
-
-  if (!poolStart) return false
+  if (poolStart === null) return false
   return poolStart <= queryEnd && poolEnd >= queryStart
 }
 
-function getYearsCovered(startDate, endDate, fallbackYear) {
-  const start = new Date(startDate)
-  const end = new Date(endDate || startDate)
-  const years = []
-
-  if (Number.isNaN(start.getTime())) {
-    const year = Number(fallbackYear)
-    return year ? [year] : []
-  }
-
-  const startYear = start.getFullYear()
-  const endYear = Number.isNaN(end.getTime()) ? startYear : end.getFullYear()
-
-  for (let year = startYear; year <= endYear; year += 1) {
-    years.push(year)
-  }
-
-  return years
-}
-
-function isPoolActiveInYear(pool, year) {
-  const selected = Number(year)
-  if (!selected) return false
-
-  const poolStart = toTime(pool.startDate)
-  const poolEnd = toTime(pool.endDate || pool.startDate) || poolStart
-  const yearStart = toTime(`${selected}-01-01`)
-  const yearEnd = toTime(`${selected}-12-31`)
-
-  if (!poolStart) return Number(pool.year) === selected
-  return poolStart <= yearEnd && poolEnd >= yearStart
-}
-
-function getActiveMonths(startDate, endDate, year) {
-  if (!startDate) return []
-
-  const start = new Date(startDate)
-  const end = new Date(endDate || startDate)
-  const monthsSet = new Set()
-
-  if (Number.isNaN(start.getTime())) return []
-
-  const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
-  const finalDate = Number.isNaN(end.getTime()) ? start : end
-
-  while (cursor <= finalDate) {
-    if (cursor.getFullYear() === Number(year)) {
-      monthsSet.add(cursor.getMonth() + 1)
-    }
-    cursor.setMonth(cursor.getMonth() + 1)
-  }
-
-  return [...monthsSet]
-}
-
 function markOverlaps(pools) {
-  return pools.map((pool, index) => {
-    const hasOverlap = pools.some((other, otherIndex) => {
-      if (index === otherIndex) return false
-      return isOverlapping(pool, other)
-    })
-
-    return {
-      ...pool,
-      hasOverlap,
-    }
-  })
+  return pools.map((pool, index) => ({
+    ...pool,
+    hasOverlap: pools.some((other, otherIndex) => index !== otherIndex && isOverlapping(pool, other)),
+  }))
 }
 
-function isOverlapping(a, b) {
-  const aStart = toTime(a.startDate)
-  const aEnd = toTime(a.endDate || a.startDate)
-  const bStart = toTime(b.startDate)
-  const bEnd = toTime(b.endDate || b.startDate)
-
-  if (!aStart || !bStart) return false
-  return aStart <= bEnd && bStart <= aEnd
+function comparePoolsByDisplayDate(a, b, month) {
+  const aDate = getDisplayDate(a, month, selectedYear.value)
+  const bDate = getDisplayDate(b, month, selectedYear.value)
+  const displayDiff = (toTime(aDate) ?? 0) - (toTime(bDate) ?? 0)
+  return displayDiff || comparePools(a, b)
 }
 
-function comparePools(a, b) {
-  const startDiff = toTime(a.startDate) - toTime(b.startDate)
-  if (startDiff !== 0) return startDiff
-
-  const endDiff = toTime(a.endDate || a.startDate) - toTime(b.endDate || b.startDate)
-  if (endDiff !== 0) return endDiff
-
-  return a.name.localeCompare(b.name, 'zh-Hant')
+function getMonthPoolCount(monthValue) {
+  return (poolsByMonth.value[monthValue] || []).reduce((sum, group) => sum + group.pools.length, 0)
 }
 
 function resetFilters() {
@@ -557,74 +342,6 @@ function resetFilters() {
   selectedCharacter.value = 'all'
   showRerun.value = false
   hideFreeStar.value = false
-}
-
-function formatRange(startDate, endDate) {
-  if (!startDate) return '日期未定'
-  if (!endDate || startDate === endDate) return startDate
-  return `${startDate} ~ ${endDate}`
-}
-
-function getDisplayDate(pool, month) {
-  const year = Number(selectedYear.value)
-  const start = new Date(pool.startDate)
-  const end = new Date(pool.endDate || pool.startDate)
-
-  if (Number.isNaN(start.getTime())) return pool.startDate || ''
-
-  const startYear = start.getFullYear()
-  const startMonth = start.getMonth() + 1
-  const endYear = Number.isNaN(end.getTime()) ? startYear : end.getFullYear()
-  const endMonth = Number.isNaN(end.getTime()) ? startMonth : end.getMonth() + 1
-
-  // 在卡池開始的月份，顯示起始日
-  if (startYear === year && startMonth === month) {
-    return pool.startDate
-  }
-
-  // 跨月份或跨年度卡池，在結束月份顯示結束日
-  if (endYear === year && endMonth === month) {
-    return pool.endDate || pool.startDate
-  }
-
-  // 若卡池橫跨整個中間月份，顯示該月份 1 號，讓時間軸順序合理
-  return `${year}-${pad(month)}-01`
-}
-
-function comparePoolsByDisplayDate(a, b, month) {
-  const displayDiff = toTime(getDisplayDate(a, month)) - toTime(getDisplayDate(b, month))
-  if (displayDiff !== 0) return displayDiff
-
-  return comparePools(a, b)
-}
-
-function groupPoolsByDisplayDate(pools, month) {
-  const groups = new Map()
-
-  pools.forEach((pool) => {
-    const displayDate = getDisplayDate(pool, month)
-    if (!groups.has(displayDate)) {
-      groups.set(displayDate, {
-        displayDate,
-        day: displayDate ? displayDate.slice(8, 10) : '--',
-        monthDay: displayDate ? displayDate.slice(5, 10) : '',
-        pools: [],
-      })
-    }
-
-    groups.get(displayDate).pools.push(pool)
-  })
-
-  return [...groups.values()].sort((a, b) => toTime(a.displayDate) - toTime(b.displayDate))
-}
-
-function toTime(date) {
-  const time = new Date(date).getTime()
-  return Number.isNaN(time) ? 0 : time
-}
-
-function pad(value) {
-  return String(value).padStart(2, '0')
 }
 </script>
 

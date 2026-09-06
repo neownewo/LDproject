@@ -1,30 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import Home from '../pages/Home.vue'
-import Guides from '../pages/Guides.vue'
-import GuidePost from '../pages/GuidePost.vue'
-import Gacha from '../pages/GachaCalendar.vue'
-import Sun from '../pages/Sunteam.vue'
-import SunPost from '../pages/SunteamPost.vue'
-import Events from '../pages/Events.vue'
-
-
 const routes = [
-  { path: '/', component: Home },
-  { path: '/guides', component: Guides },
-  {path: '/guide-post',component: GuidePost},
-  { path: '/gacha', component: Gacha },
-  { path: '/sunteam', component: Sun },
-  {path: '/sunteam-post',component: SunPost},
- 
-  { path: '/events', component: Events },
-
+  { path: '/', component: () => import('../pages/Home.vue') },
+  { path: '/guides', component: () => import('../pages/Guides.vue') },
+  { path: '/guide-post', component: () => import('../pages/GuidePost.vue') },
+  { path: '/gacha', component: () => import('../pages/GachaCalendar.vue') },
+  { path: '/sunteam', component: () => import('../pages/Sunteam.vue') },
+  { path: '/sunteam-post', component: () => import('../pages/SunteamPost.vue') },
+  { path: '/events', component: () => import('../pages/Events.vue') },
+  { path: '/neiwneiw', component: () => import('../pages/neiwneiw/Neiwneiw.vue'), meta: { hidden: true } },
 ]
 
 export default createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior() {
-    return { top: 0 }
-  },
+  scrollBehavior: () => ({ top: 0 }),
 })

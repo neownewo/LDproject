@@ -4,7 +4,7 @@
     <section id="hero">
       <HeroBanner
         :title="SITE.title"
-        desc="若小狼正式回歸，會再更新...."
+        desc="耶比～ 第一次投稿深空徵集被選上了 開心(*´꒳`*)"
       >
       <template #actions>
         <a
