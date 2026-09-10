@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f9ff" />
+    <meta name="description" content="戀與深空抽卡紀錄器：紀錄每個卡池的抽數、疊卡層級與課金金額。" />
+    <title>抽卡紀錄器｜戀與深空攻略情報</title>
+    <link rel="stylesheet" href="./record.css" />
+  </head>
+  <body>
+    <div class="space-orb orb-one"></div>
+    <div class="space-orb orb-two"></div>
+
+    <main class="app-shell">
+      <section id="authView" class="auth-wrap">
+        <div class="brand-mark">RECORD</div>
+        <div class="auth-card glass-card">
+          <div class="auth-heading">
+            <span class="eyebrow">LOVE AND DEEPSPACE</span>
+            <h1>抽卡紀錄器</h1>
+            <p>把每一次心動、歐氣與荷包痛都好好記下來。</p>
+          </div>
+
+          <form id="loginForm" class="form-stack" novalidate>
+            <label class="field">
+              <span>帳號</span>
+              <input id="accountInput" autocomplete="username" maxlength="50" inputmode="text" placeholder="僅限英文字母與數字" required />
+              <small>登入帳號不會顯示在紀錄頁面。</small>
+            </label>
+
+            <label class="field">
+              <span>獵人編號後 5 碼</span>
+              <input id="hunterCodeInput" type="password" autocomplete="current-password" maxlength="5" inputmode="numeric" placeholder="00000" required />
+              <small>僅限 5 位數字。</small>
+            </label>
+
+            <p class="auth-note">用最基本的帳號控管資料，避免大家忘記密碼就統一要求輸入獵人編號後5碼啦～</p>
+            <p id="loginMessage" class="form-message" aria-live="polite"></p>
+            <button id="loginButton" class="primary-button" type="submit">進入紀錄器</button>
+          </form>
+
+          <form id="registerForm" class="form-stack hidden" novalidate>
+            <div class="first-time-box">
+              <span class="sparkle">✦</span>
+              <div>
+                <strong>第一次來嗎？</strong>
+                <p>這個帳號還沒有紀錄，幫自己取一個畫面上顯示的暱稱吧。</p>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>暱稱</span>
+              <input id="nicknameInput" maxlength="20" inputmode="text" placeholder="僅限中文" required />
+              <small>之後畫面只顯示暱稱，不會顯示登入帳號。</small>
+            </label>
+
+            <div class="confirm-login-info">
+              <span>準備建立帳號</span>
+              <strong id="registerAccountPreview"></strong>
+              <em>獵人編號：•••••</em>
+            </div>
+
+            <p id="registerMessage" class="form-message" aria-live="polite"></p>
+            <button id="registerButton" class="primary-button" type="submit">建立我的抽卡紀錄</button>
+            <button id="backToLoginButton" class="text-button" type="button">返回修改登入資料</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="recordView" class="record-view hidden">
+        <header class="topbar glass-card">
+          <div>
+            <span class="eyebrow">GACHA RECORD</span>
+            <h1><span id="nicknameDisplay"></span>的抽卡紀錄</h1>
+          </div>
+          <div class="topbar-actions">
+            <a class="ghost-button" href="/" target="_blank" rel="noopener">攻略網站 ↗</a>
+            <button id="logoutButton" class="ghost-button" type="button">登出</button>
+          </div>
+        </header>
+
+        <section class="stats-grid" aria-label="抽卡統計">
+          <article class="stat-card glass-card">
+            <span>已紀錄卡池</span>
+            <strong><b id="recordedPoolCount">0</b> / <small id="totalPoolCount">0</small></strong>
+          </article>
+          <article class="stat-card glass-card">
+            <span>總抽數</span>
+            <strong><b id="totalPulls">0</b><small> 抽</small></strong>
+          </article>
+          <article class="stat-card glass-card">
+            <span>總課金</span>
+            <strong><small>NT$ </small><b id="totalAmount">0</b></strong>
+          </article>
+          <article class="stat-card glass-card">
+            <span>平均每池</span>
+            <strong><b id="averagePulls">0</b><small> 抽</small></strong>
+          </article>
+        </section>
+
+        <section class="toolbar glass-card">
+          <div class="search-box">
+            <span>⌕</span>
+            <input id="searchInput" type="search" placeholder="搜尋卡池名稱或角色" />
+          </div>
+          <div class="filters">
+            <select id="yearFilter" aria-label="年份"><option value="all">全部年份</option></select>
+            <select id="characterFilter" aria-label="角色"><option value="all">全部角色</option></select>
+            <select id="typeFilter" aria-label="卡池類型">
+              <option value="all">全部類型</option>
+              <option value="single">單人卡池</option>
+              <option value="multi">多人卡池</option>
+              <option value="daily">日卡</option>
+              <option value="free">免費五星</option>
+            </select>
+            <select id="recordFilter" aria-label="紀錄狀態">
+              <option value="all">全部卡池</option>
+              <option value="recorded">已紀錄</option>
+              <option value="unrecorded">未紀錄</option>
+            </select>
+          </div>
+        </section>
+
+        <div class="list-heading">
+          <div>
+            <span class="eyebrow">POOL LIST</span>
+            <h2>卡池紀錄</h2>
+          </div>
+          <p id="listSummary">讀取卡池中…</p>
+        </div>
+
+        <div id="poolGrid" class="pool-grid"></div>
+        <div id="emptyState" class="empty-state glass-card hidden">目前沒有符合條件的卡池。</div>
+      </section>
+    </main>
+
+    <div id="editorModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+      <div class="modal-card glass-card">
+        <button id="closeModalButton" class="modal-close" type="button" aria-label="關閉">×</button>
+        <div id="editorImage" class="editor-image"></div>
+        <div class="editor-content">
+          <span id="editorMeta" class="eyebrow"></span>
+          <h2 id="editorTitle">卡池名稱</h2>
+          <p id="editorCharacters" class="editor-characters"></p>
+
+          <form id="recordForm" class="editor-form" novalidate>
+            <fieldset class="rank-fieldset">
+              <legend>疊卡層級</legend>
+              <div class="rank-options">
+                <label><input type="radio" name="rank" value="0" checked /><span>0階</span></label>
+                <label><input type="radio" name="rank" value="1" /><span>1階</span></label>
+                <label><input type="radio" name="rank" value="2" /><span>2階</span></label>
+                <label><input type="radio" name="rank" value="3" /><span>疊滿</span></label>
+              </div>
+            </fieldset>
+
+            <div class="number-grid">
+              <label class="field">
+                <span>抽數</span>
+                <div class="input-suffix"><input id="pullCountInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required /><em>抽</em></div>
+              </label>
+              <label class="field">
+                <span>課金金額</span>
+                <div class="input-prefix"><em>NT$</em><input id="amountInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required /></div>
+              </label>
+            </div>
+
+            <div id="luckPreview" class="luck-preview">
+              <span>簡易運氣評估</span>
+              <strong>輸入抽數後就會幫你算 ✦</strong>
+              <small>依目前疊卡張數與平均抽數／張簡易估算。</small>
+            </div>
+
+            <p id="recordMessage" class="form-message" aria-live="polite"></p>
+            <div class="modal-actions">
+              <button id="deleteRecordButton" class="danger-button hidden" type="button">刪除紀錄</button>
+              <button id="saveRecordButton" class="primary-button" type="submit">儲存紀錄</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+    <script type="module" src="./record.js"></script>
+  </body>
+</html>
