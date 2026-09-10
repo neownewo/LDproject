@@ -23,18 +23,8 @@ const MAX_BYTES = 2 * 1024 * 1024
 
 function routeParts(req) {
   const raw = req.query?.path
-  if (Array.isArray(raw)) {
-    return raw
-      .flatMap((part) => String(part).split('/'))
-      .filter(Boolean)
-      .map(decodeURIComponent)
-  }
-  if (raw !== undefined && raw !== null && String(raw)) {
-    return String(raw)
-      .split('/')
-      .filter(Boolean)
-      .map(decodeURIComponent)
-  }
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
+  if (raw !== undefined && raw !== null && String(raw)) return [String(raw)]
 
   // 本機或不同 adapter 下的備援解析。
   const pathname = String(req.url || '').split('?')[0]
@@ -102,7 +92,13 @@ function handleSession(req, res) {
 
 async function handleGachaCollection(req, res) {
   if (!requireAdmin(req, res)) return
-  if (!onlyMethods(req, res, ['GET', 'POST'])) return
+  if (!onlyMethods(req, res, ['GET', 'POST', 'PATCH', 'DELETE'])) return
+
+  // 編輯 / 刪除改用 ?id=UUID，避免 Vercel 對 /gacha/:id 的 nested catch-all 路由出現 404。
+  if (req.method === 'PATCH' || req.method === 'DELETE') {
+    const id = Array.isArray(req.query?.id) ? req.query.id[0] : req.query?.id
+    return handleGachaItem(req, res, id)
+  }
 
   try {
     if (req.method === 'GET') return res.status(200).json((await listGachaPools()) || [])

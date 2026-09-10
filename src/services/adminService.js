@@ -43,14 +43,14 @@ export function createAdminGachaPool(payload) {
 }
 
 export function updateAdminGachaPool(id, payload) {
-  return request(`/api/neiwneiw/gacha/${encodeURIComponent(id)}`, {
+  return request(`/api/neiwneiw/gacha?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
 }
 
 export function deleteAdminGachaPool(id) {
-  return request(`/api/neiwneiw/gacha/${encodeURIComponent(id)}`, {
+  return request(`/api/neiwneiw/gacha?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
     body: '{}',
   })
