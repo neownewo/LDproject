@@ -62,3 +62,8 @@ export function uploadAdminImage(payload) {
     body: JSON.stringify(payload),
   })
 }
+
+
+export function fetchAdminRecordAnalytics() {
+  return request('/api/neiwneiw/records')
+}

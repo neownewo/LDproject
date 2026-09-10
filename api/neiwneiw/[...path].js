@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { getJsonBody, onlyMethods } from '../../lib/api/http.js'
+import { getRecordPools } from '../../lib/api/recordPools.js'
 import {
   clearAdminSessionCookie,
   createAdminSessionCookie,
@@ -132,6 +133,182 @@ async function handleGachaItem(req, res, id) {
   }
 }
 
+
+function acquiredCopiesByRecord(cardRows) {
+  const copies = new Map()
+  for (const card of Array.isArray(cardRows) ? cardRows : []) {
+    const rank = Number(card.rank)
+    if (!Number.isInteger(rank) || rank < 0 || rank > 3) continue
+    copies.set(card.record_id, (copies.get(card.record_id) || 0) + rank + 1)
+  }
+  return copies
+}
+
+function roundNumber(value, digits = 1) {
+  const factor = 10 ** digits
+  return Math.round((Number(value) || 0) * factor) / factor
+}
+
+async function handleRecordAnalytics(req, res) {
+  if (!requireAdmin(req, res)) return
+  if (!onlyMethods(req, res, ['GET'])) return
+
+  try {
+    const [users, records, cardRows, poolRows] = await Promise.all([
+      dbRequest('record_users?select=id,account,nickname,created_at,last_login_at&order=created_at.desc'),
+      dbRequest('gacha_records?select=id,user_id,pool_key,pull_count,amount_twd,created_at,updated_at&order=updated_at.desc'),
+      dbRequest('gacha_record_cards?select=record_id,rank'),
+      getRecordPools().catch(() => []),
+    ])
+
+    const safeUsers = Array.isArray(users) ? users : []
+    const safeRecords = Array.isArray(records) ? records : []
+    const copiesByRecord = acquiredCopiesByRecord(cardRows)
+    const userById = new Map(safeUsers.map((user) => [user.id, user]))
+    const poolByKey = new Map((Array.isArray(poolRows) ? poolRows : []).map((pool) => [pool.poolKey, pool]))
+
+    const userStats = new Map(safeUsers.map((user) => [user.id, {
+      id: user.id,
+      account: user.account,
+      nickname: user.nickname,
+      createdAt: user.created_at,
+      lastLoginAt: user.last_login_at,
+      recordCount: 0,
+      totalPulls: 0,
+      totalAmount: 0,
+      totalCopies: 0,
+    }]))
+
+    const poolGroups = new Map()
+    for (const record of safeRecords) {
+      const pulls = Number(record.pull_count) || 0
+      const amount = Number(record.amount_twd) || 0
+      const copies = copiesByRecord.get(record.id) || 0
+      const user = userById.get(record.user_id)
+      const userName = user?.nickname || user?.account || '未知使用者'
+
+      if (!userStats.has(record.user_id)) {
+        userStats.set(record.user_id, {
+          id: record.user_id,
+          account: user?.account || '',
+          nickname: user?.nickname || '未知使用者',
+          createdAt: user?.created_at || '',
+          lastLoginAt: user?.last_login_at || '',
+          recordCount: 0,
+          totalPulls: 0,
+          totalAmount: 0,
+          totalCopies: 0,
+        })
+      }
+      const u = userStats.get(record.user_id)
+      u.recordCount += 1
+      u.totalPulls += pulls
+      u.totalAmount += amount
+      u.totalCopies += copies
+
+      if (!poolGroups.has(record.pool_key)) poolGroups.set(record.pool_key, [])
+      poolGroups.get(record.pool_key).push({
+        userId: record.user_id,
+        nickname: userName,
+        account: user?.account || '',
+        pulls,
+        amount,
+        copies,
+        pullsPerCopy: copies > 0 ? pulls / copies : null,
+      })
+    }
+
+    const poolStats = [...poolGroups.entries()].map(([poolKey, entries]) => {
+      const meta = poolByKey.get(poolKey)
+      const totalPulls = entries.reduce((sum, row) => sum + row.pulls, 0)
+      const totalAmount = entries.reduce((sum, row) => sum + row.amount, 0)
+      const totalCopies = entries.reduce((sum, row) => sum + row.copies, 0)
+      const luckEntries = entries.filter((row) => row.pullsPerCopy !== null)
+      const mostLucky = luckEntries.length
+        ? luckEntries.reduce((best, row) => row.pullsPerCopy < best.pullsPerCopy ? row : best)
+        : null
+      const mostUnlucky = luckEntries.length
+        ? luckEntries.reduce((worst, row) => row.pullsPerCopy > worst.pullsPerCopy ? row : worst)
+        : null
+      const highestSpend = entries.length
+        ? entries.reduce((best, row) => row.amount > best.amount ? row : best)
+        : null
+      const lowestSpend = entries.length
+        ? entries.reduce((best, row) => row.amount < best.amount ? row : best)
+        : null
+
+      return {
+        poolKey,
+        name: meta?.name || poolKey,
+        startDate: meta?.startDate || '',
+        poolType: meta?.poolType || '',
+        characters: meta?.characters || [],
+        participantCount: entries.length,
+        totalPulls,
+        totalAmount,
+        totalCopies,
+        averagePullsPerPerson: entries.length ? roundNumber(totalPulls / entries.length) : 0,
+        averageAmountPerPerson: entries.length ? Math.round(totalAmount / entries.length) : 0,
+        averagePullsPerCopy: totalCopies ? roundNumber(totalPulls / totalCopies) : 0,
+        mostLucky: mostLucky ? {
+          nickname: mostLucky.nickname,
+          account: mostLucky.account,
+          pulls: mostLucky.pulls,
+          copies: mostLucky.copies,
+          pullsPerCopy: roundNumber(mostLucky.pullsPerCopy),
+        } : null,
+        mostUnlucky: mostUnlucky ? {
+          nickname: mostUnlucky.nickname,
+          account: mostUnlucky.account,
+          pulls: mostUnlucky.pulls,
+          copies: mostUnlucky.copies,
+          pullsPerCopy: roundNumber(mostUnlucky.pullsPerCopy),
+        } : null,
+        highestSpend: highestSpend ? {
+          nickname: highestSpend.nickname,
+          account: highestSpend.account,
+          amount: highestSpend.amount,
+        } : null,
+        lowestSpend: lowestSpend ? {
+          nickname: lowestSpend.nickname,
+          account: lowestSpend.account,
+          amount: lowestSpend.amount,
+        } : null,
+      }
+    }).sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)) || a.name.localeCompare(b.name, 'zh-Hant'))
+
+    const usersResult = [...userStats.values()]
+      .map((user) => ({
+        ...user,
+        averagePullsPerCopy: user.totalCopies ? roundNumber(user.totalPulls / user.totalCopies) : 0,
+      }))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+
+    const activeUserIds = new Set(safeRecords.map((row) => row.user_id))
+    const totalPulls = safeRecords.reduce((sum, row) => sum + (Number(row.pull_count) || 0), 0)
+    const totalAmount = safeRecords.reduce((sum, row) => sum + (Number(row.amount_twd) || 0), 0)
+    const totalCopies = [...copiesByRecord.values()].reduce((sum, value) => sum + value, 0)
+
+    return res.status(200).json({
+      summary: {
+        accountCount: safeUsers.length,
+        activeAccountCount: activeUserIds.size,
+        recordCount: safeRecords.length,
+        poolCount: poolGroups.size,
+        totalPulls,
+        totalAmount,
+        totalCopies,
+        averagePullsPerCopy: totalCopies ? roundNumber(totalPulls / totalCopies) : 0,
+      },
+      users: usersResult,
+      pools: poolStats,
+    })
+  } catch (error) {
+    console.error('neiwneiw record analytics failed', error)
+    return res.status(500).json({ error: error.message || 'RECORD_ANALYTICS_FAILED' })
+  }
+}
+
 async function handleUpload(req, res) {
   if (!requireAdmin(req, res)) return
   if (!onlyMethods(req, res, ['POST'])) return
@@ -164,6 +341,7 @@ export default async function handler(req, res) {
   if (parts.length === 1 && resource === 'logout') return handleLogout(req, res)
   if (parts.length === 1 && resource === 'session') return handleSession(req, res)
   if (parts.length === 1 && resource === 'gacha') return handleGachaCollection(req, res)
+  if (parts.length === 1 && resource === 'records') return handleRecordAnalytics(req, res)
   if (parts.length === 2 && resource === 'gacha') return handleGachaItem(req, res, id)
   if (parts.length === 1 && resource === 'upload') return handleUpload(req, res)
 

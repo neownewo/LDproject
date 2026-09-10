@@ -1,0 +1,27 @@
+抽卡紀錄器後台管理功能
+
+新增：
+- neiwneiw 後台分成「卡池管理」與「抽卡紀錄器管理」兩個頁籤。
+- 原本卡池新增 / 編輯 / 複製 / 刪除功能保留。
+- 後台可查看 record_users 帳號、暱稱、建立時間、最後登入、紀錄池數、總抽數、總課金、平均抽數/五星張數。
+- 各卡池顯示：紀錄人數、人均抽數、人均課金、平均抽數/五星張數、最歐、最非、課金最高、課金最低。
+- 最歐 / 最非採「抽數 ÷ 該使用者在此池取得的五星張數」比較，避免 0階與疊滿直接用總抽數比較失真。
+- 課金最低會包含 NT$0，方便看無課玩家。
+- 不顯示 hunter_code_hash。
+
+API：
+GET /api/neiwneiw/records
+沿用原本 neiwneiw 管理員 Session 權限。
+
+SQL：
+不需要新增資料表或 migration。
+前提是現有 service_role 已有 record_users、gacha_records、gacha_record_cards 的 SELECT 權限（record_cards_migration.sql 原本已包含 grant）。
+
+本次主要異動：
+- api/neiwneiw/[...path].js
+- src/services/adminService.js
+- src/pages/neiwneiw/Neiwneiw.vue
+
+另將上一版的「備註作為卡名」改動一併保留：
+- lib/api/recordPools.js
+- public/record/record.js
