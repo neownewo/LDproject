@@ -23,8 +23,18 @@ const MAX_BYTES = 2 * 1024 * 1024
 
 function routeParts(req) {
   const raw = req.query?.path
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
-  if (raw !== undefined && raw !== null && String(raw)) return [String(raw)]
+  if (Array.isArray(raw)) {
+    return raw
+      .flatMap((part) => String(part).split('/'))
+      .filter(Boolean)
+      .map(decodeURIComponent)
+  }
+  if (raw !== undefined && raw !== null && String(raw)) {
+    return String(raw)
+      .split('/')
+      .filter(Boolean)
+      .map(decodeURIComponent)
+  }
 
   // 本機或不同 adapter 下的備援解析。
   const pathname = String(req.url || '').split('?')[0]
