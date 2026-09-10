@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>圖片壓縮小工具</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #20242c;
+      --muted: #6f7785;
+      --line: #e7e9ef;
+      --accent: #635bff;
+      --accent-weak: #eeecff;
+      --ok: #14804a;
+      --danger: #b42318;
+      --shadow: 0 16px 48px rgba(30, 36, 50, .08);
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 34px 20px 50px; }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 42px); letter-spacing: -.03em; }
+    .lead { margin: 9px 0 0; color: var(--muted); line-height: 1.7; }
+    .panel {
+      margin-top: 24px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .settings {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    label { display: grid; gap: 7px; font-size: 13px; color: var(--muted); }
+    select, input[type="number"], input[type="range"] {
+      width: 100%;
+    }
+    select, input[type="number"] {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 11px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+    .range-line { display: flex; align-items: center; gap: 8px; }
+    .range-line output { min-width: 36px; text-align: right; color: var(--text); font-weight: 700; }
+    .drop {
+      margin: 18px;
+      min-height: 210px;
+      border: 2px dashed #cfd3df;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 26px;
+      transition: .18s ease;
+      cursor: pointer;
+      background: linear-gradient(180deg, #fff, #fafaff);
+    }
+    .drop.drag { border-color: var(--accent); background: var(--accent-weak); transform: scale(.997); }
+    .drop strong { display: block; font-size: 20px; margin-bottom: 7px; }
+    .drop span { color: var(--muted); font-size: 14px; }
+    .btn {
+      border: 0;
+      border-radius: 11px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn.secondary { background: #eef0f5; color: var(--text); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 18px 18px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .toolbar .summary { color: var(--muted); font-size: 14px; }
+    .toolbar .actions { display: flex; gap: 8px; }
+    .list { display: grid; gap: 12px; padding: 0 18px 18px; }
+    .item {
+      display: grid;
+      grid-template-columns: 84px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 11px;
+      background: #fff;
+    }
+    .thumb {
+      width: 84px;
+      height: 84px;
+      object-fit: cover;
+      border-radius: 10px;
+      background: #f0f1f5;
+    }
+    .name { font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .meta { margin-top: 5px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .save { margin-top: 5px; font-size: 13px; color: var(--ok); font-weight: 700; }
+    .save.bad { color: var(--danger); }
+    .status { color: var(--muted); font-size: 13px; }
+    .footer-note { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    input[type=file] { display: none; }
+    @media (max-width: 760px) {
+      .settings { grid-template-columns: 1fr 1fr; }
+      .item { grid-template-columns: 68px minmax(0, 1fr); }
+      .thumb { width: 68px; height: 68px; }
+      .item > .btn { grid-column: 1 / -1; width: 100%; }
+    }
+    @media (max-width: 500px) {
+      .settings { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>圖片壓縮小工具</h1>
+    <p class="lead">免安裝、免上傳伺服器。直接雙擊這個 HTML 開啟，把圖片丟進來就會在瀏覽器本機壓縮。</p>
+
+    <section class="panel">
+      <div class="settings">
+        <label>
+          輸出格式
+          <select id="format">
+            <option value="image/webp" selected>WebP（推薦）</option>
+            <option value="image/jpeg">JPEG</option>
+            <option value="image/png">PNG</option>
+          </select>
+        </label>
+        <label>
+          最大寬度（px）
+          <input id="maxWidth" type="number" min="320" max="6000" step="10" value="1200" />
+        </label>
+        <label>
+          最大高度（px）
+          <input id="maxHeight" type="number" min="320" max="6000" step="10" value="1600" />
+        </label>
+        <label>
+          畫質
+          <div class="range-line">
+            <input id="quality" type="range" min="50" max="100" value="82" />
+            <output id="qualityText">82</output>
+          </div>
+        </label>
+      </div>
+
+      <label class="drop" id="dropZone" for="fileInput">
+        <div>
+          <strong>把圖片拖到這裡</strong>
+          <span>或點一下選擇圖片，可一次選多張。選取後會自動開始壓縮。</span>
+        </div>
+      </label>
+      <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+
+      <div class="toolbar">
+        <div class="summary" id="summary">尚未選擇圖片</div>
+        <div class="actions">
+          <button class="btn secondary" id="clearBtn" disabled>清空</button>
+          <button class="btn" id="downloadAllBtn" disabled>全部下載</button>
+        </div>
+      </div>
+
+      <div class="list" id="list"></div>
+    </section>
+
+    <p class="footer-note">預設設定是我幫你網站圖片抓的實用值：WebP、最大 1200 × 1600、畫質 82。圖片只在你的電腦瀏覽器裡處理，不會上傳到任何地方。</p>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const fileInput = $('fileInput');
+    const dropZone = $('dropZone');
+    const list = $('list');
+    const summary = $('summary');
+    const clearBtn = $('clearBtn');
+    const downloadAllBtn = $('downloadAllBtn');
+    const quality = $('quality');
+    const qualityText = $('qualityText');
+    const format = $('format');
+    const maxWidth = $('maxWidth');
+    const maxHeight = $('maxHeight');
+
+    let results = [];
+
+    quality.addEventListener('input', () => qualityText.value = quality.value);
+
+    ['dragenter', 'dragover'].forEach(evt => dropZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag');
+    }));
+    ['dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag');
+    }));
+    dropZone.addEventListener('drop', (e) => handleFiles([...e.dataTransfer.files]));
+    fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
+
+    clearBtn.addEventListener('click', () => {
+      results.forEach(r => {
+        if (r.previewUrl) URL.revokeObjectURL(r.previewUrl);
+        if (r.downloadUrl) URL.revokeObjectURL(r.downloadUrl);
+      });
+      results = [];
+      list.innerHTML = '';
+      fileInput.value = '';
+      updateToolbar();
+    });
+
+    downloadAllBtn.addEventListener('click', async () => {
+      const ready = results.filter(r => r.blob);
+      for (let i = 0; i < ready.length; i++) {
+        downloadResult(ready[i]);
+        await new Promise(r => setTimeout(r, 220));
+      }
+    });
+
+    function bytes(n) {
+      if (!Number.isFinite(n)) return '-';
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / 1024 / 1024).toFixed(2)} MB`;
+    }
+
+    function extensionFor(mime) {
+      return mime === 'image/jpeg' ? 'jpg' : mime === 'image/png' ? 'png' : 'webp';
+    }
+
+    function baseName(name) {
+      return name.replace(/\.[^.]+$/, '');
+    }
+
+    function getOutputName(fileName, mime) {
+      return `${baseName(fileName)}-compressed.${extensionFor(mime)}`;
+    }
+
+    function updateToolbar() {
+      const done = results.filter(r => r.blob);
+      const inputTotal = results.reduce((sum, r) => sum + (r.file?.size || 0), 0);
+      const outputTotal = done.reduce((sum, r) => sum + (r.blob?.size || 0), 0);
+      if (!results.length) {
+        summary.textContent = '尚未選擇圖片';
+      } else if (!done.length) {
+        summary.textContent = `處理中，共 ${results.length} 張`;
+      } else {
+        const diff = inputTotal > 0 ? Math.round((1 - outputTotal / inputTotal) * 100) : 0;
+        summary.textContent = `${done.length}/${results.length} 張完成｜${bytes(inputTotal)} → ${bytes(outputTotal)}｜${diff >= 0 ? '節省 ' + diff + '%' : '增加 ' + Math.abs(diff) + '%'}`;
+      }
+      clearBtn.disabled = !results.length;
+      downloadAllBtn.disabled = !done.length;
+    }
+
+    async function handleFiles(files) {
+      const images = files.filter(f => f.type.startsWith('image/'));
+      if (!images.length) return;
+
+      for (const file of images) {
+        const record = { file, status: '壓縮中…' };
+        results.push(record);
+        renderRecord(record);
+        updateToolbar();
+        try {
+          await compress(record);
+          record.status = '完成';
+        } catch (err) {
+          console.error(err);
+          record.status = '處理失敗';
+          record.error = true;
+        }
+        renderAll();
+        updateToolbar();
+      }
+    }
+
+    async function compress(record) {
+      const file = record.file;
+      const mime = format.value;
+      const q = Number(quality.value) / 100;
+      const mw = Math.max(1, Number(maxWidth.value) || 1200);
+      const mh = Math.max(1, Number(maxHeight.value) || 1600);
+
+      const bitmap = await loadImage(file);
+      const scale = Math.min(1, mw / bitmap.width, mh / bitmap.height);
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { alpha: mime !== 'image/jpeg' });
+
+      if (mime === 'image/jpeg') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+      }
+      ctx.drawImage(bitmap, 0, 0, width, height);
+
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('瀏覽器無法輸出此格式')), mime, q);
+      });
+
+      record.width = width;
+      record.height = height;
+      record.blob = blob;
+      record.outputName = getOutputName(file.name, mime);
+      record.previewUrl = URL.createObjectURL(blob);
+      record.downloadUrl = record.previewUrl;
+    }
+
+    async function loadImage(file) {
+      if ('createImageBitmap' in window) {
+        try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (_) {}
+      }
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('讀取圖片失敗')); };
+        img.src = url;
+      });
+    }
+
+    function renderRecord(record) {
+      const index = results.indexOf(record);
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.dataset.index = index;
+      div.innerHTML = `
+        ${record.previewUrl ? `<img class="thumb" src="${record.previewUrl}" alt="">` : `<div class="thumb"></div>`}
+        <div>
+          <div class="name" title="${escapeHtml(record.file.name)}">${escapeHtml(record.file.name)}</div>
+          <div class="meta">
+            原始：${bytes(record.file.size)}
+            ${record.blob ? `｜壓縮：${bytes(record.blob.size)}｜${record.width} × ${record.height}` : ''}
+          </div>
+          ${record.blob ? savingText(record) : `<div class="status">${record.status}</div>`}
+        </div>
+        <button class="btn" ${record.blob ? '' : 'disabled'} data-download="${index}">下載</button>
+      `;
+      const old = list.querySelector(`[data-index="${index}"]`);
+      if (old) old.replaceWith(div); else list.appendChild(div);
+      const btn = div.querySelector('[data-download]');
+      if (btn && record.blob) btn.addEventListener('click', () => downloadResult(record));
+    }
+
+    function renderAll() {
+      results.forEach(renderRecord);
+    }
+
+    function savingText(record) {
+      const pct = Math.round((1 - record.blob.size / record.file.size) * 100);
+      return pct >= 0
+        ? `<div class="save">節省 ${pct}%</div>`
+        : `<div class="save bad">這張輸出反而大 ${Math.abs(pct)}%</div>`;
+    }
+
+    function downloadResult(record) {
+      const a = document.createElement('a');
+      a.href = record.downloadUrl;
+      a.download = record.outputName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>'"]/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>
