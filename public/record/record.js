@@ -17,7 +17,7 @@ const els = {
   totalAmount: $('totalAmount'), averagePulls: $('averagePulls'), searchInput: $('searchInput'), yearFilter: $('yearFilter'),
   characterFilter: $('characterFilter'), typeFilter: $('typeFilter'), recordFilter: $('recordFilter'), poolGrid: $('poolGrid'),
   emptyState: $('emptyState'), listSummary: $('listSummary'), editorModal: $('editorModal'), closeModalButton: $('closeModalButton'),
-  editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'), editorCharacters: $('editorCharacters'), cardRankList: $('cardRankList'),
+  editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'),  cardRankList: $('cardRankList'),
   recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), amountInput: $('amountInput'), luckPreview: $('luckPreview'),
   deleteRecordButton: $('deleteRecordButton'), saveRecordButton: $('saveRecordButton'), recordMessage: $('recordMessage'), toast: $('toast'),
 }
@@ -307,12 +307,7 @@ function openEditor(poolKey) {
   const record = state.records.get(poolKey)
   els.editorTitle.textContent = pool.name
   els.editorMeta.textContent = `${getYear(pool)} · ${TYPE_LABELS[pool.poolType] || '卡池'} · ${formatDate(pool.startDate)} ～ ${formatDate(pool.endDate)}`
-  const cardNames = getPoolCards(pool)
-    .map((card) => String(card?.label || '').trim())
-    .filter(Boolean)
-  els.editorCharacters.textContent = cardNames.length
-    ? cardNames.map((name) => `「${name}」`).join('、')
-    : ((pool.characters || []).join('、') || '卡片資料未設定')
+  
   const image = pool.images?.[0]
   els.editorImage.style.backgroundImage = image ? `url("${String(image).replace(/"/g, '\\"')}")` : ''
   els.editorImage.classList.toggle('no-image', !image)
