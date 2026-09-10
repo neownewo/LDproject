@@ -173,16 +173,34 @@ async function handleRecords(req, res) {
       return res.status(200).json({ ok: true })
     }
 
-    const rank = parseInteger(body.rank)
     const pullCount = parseInteger(body.pullCount)
     const amountTwd = parseInteger(body.amountTwd)
+    const rawCards = Array.isArray(body.cards) ? body.cards : []
 
-    if (rank === null || rank < 0 || rank > 3) return sendError(res, 400, 'INVALID_RANK', '疊卡層級不正確。')
     if (pullCount === null || pullCount < 0 || pullCount > 1000000) return sendError(res, 400, 'INVALID_PULL_COUNT', '抽數不正確。')
     if (amountTwd === null || amountTwd < 0 || amountTwd > 100000000) return sendError(res, 400, 'INVALID_AMOUNT', '課金金額不正確。')
+    if (rawCards.length > 20) return sendError(res, 400, 'INVALID_CARDS', '卡片紀錄數量不正確。')
 
-    const saved = await upsertRecordEntry(session.userId, { poolKey, rank, pullCount, amountTwd })
-    return res.status(200).json(saved || { pool_key: poolKey, rank, pull_count: pullCount, amount_twd: amountTwd })
+    const cards = []
+    const seen = new Set()
+    for (const item of rawCards) {
+      const cardKey = String(item?.cardKey || '').trim()
+      const cardIndex = parseInteger(item?.cardIndex)
+      const rank = parseInteger(item?.rank)
+      const cardLabel = String(item?.cardLabel || '').trim().slice(0, 100)
+      const imageUrl = String(item?.imageUrl || '').trim().slice(0, 2000)
+
+      if (!/^card:\d+$/.test(cardKey) || cardIndex === null || cardIndex < 0 || cardIndex > 19) {
+        return sendError(res, 400, 'INVALID_CARD', '卡片識別資料不正確。')
+      }
+      if (rank === null || rank < 0 || rank > 3) return sendError(res, 400, 'INVALID_RANK', '疊卡層級不正確。')
+      if (seen.has(cardKey)) return sendError(res, 400, 'DUPLICATE_CARD', '卡片紀錄不可重複。')
+      seen.add(cardKey)
+      cards.push({ cardKey, cardIndex, cardLabel, imageUrl, rank })
+    }
+
+    const saved = await upsertRecordEntry(session.userId, { poolKey, pullCount, amountTwd, cards })
+    return res.status(200).json(saved || { pool_key: poolKey, pull_count: pullCount, amount_twd: amountTwd, cards })
   } catch (error) {
     console.error('record records failed', error)
     return sendError(res, 500, 'RECORD_FAILED', '紀錄儲存失敗，請稍後再試。')
