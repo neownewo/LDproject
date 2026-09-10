@@ -239,15 +239,24 @@ function getSavedRank(record, cardKey) {
 }
 
 function renderStats() {
-  const records = [...state.records.values()]
+  // 統計只計算目前篩選結果中的卡池。
+  // 因此年份、角色、卡池類型、紀錄狀態與關鍵字變更時，
+  // 上方總抽數／總課金／平均抽數都會同步更新。
+  const filteredPools = getFilteredPools()
+  const filteredPoolKeys = new Set(filteredPools.map((pool) => pool.poolKey))
+  const records = [...state.records.values()].filter((record) => filteredPoolKeys.has(record.pool_key))
+
   const totalPulls = records.reduce((sum, record) => sum + Number(record.pull_count || 0), 0)
   const totalAmount = records.reduce((sum, record) => sum + Number(record.amount_twd || 0), 0)
+  const totalCopies = records.reduce((sum, record) => sum + getAcquiredCopies(record), 0)
+
   els.recordedPoolCount.textContent = records.length.toLocaleString('zh-TW')
-  els.totalPoolCount.textContent = state.pools.length.toLocaleString('zh-TW')
+  els.totalPoolCount.textContent = filteredPools.length.toLocaleString('zh-TW')
   els.totalPulls.textContent = totalPulls.toLocaleString('zh-TW')
   els.totalAmount.textContent = formatMoney(totalAmount)
-  const totalCopies = records.reduce((sum, record) => sum + getAcquiredCopies(record), 0)
-  els.averagePulls.textContent = totalCopies ? Math.round(totalPulls / totalCopies).toLocaleString('zh-TW') : '0'
+  els.averagePulls.textContent = totalCopies
+    ? Math.round(totalPulls / totalCopies).toLocaleString('zh-TW')
+    : '0'
 }
 
 function poolCard(pool) {
@@ -437,7 +446,7 @@ els.editorModal.addEventListener('click', (event) => { if (event.target === els.
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !els.editorModal.classList.contains('hidden')) closeEditor() })
 
 for (const el of [els.searchInput, els.yearFilter, els.characterFilter, els.typeFilter, els.recordFilter]) {
-  el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', renderPools)
+  el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', renderAll)
 }
 
 els.poolGrid.addEventListener('click', async (event) => {
