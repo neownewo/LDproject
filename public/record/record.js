@@ -17,12 +17,12 @@ const els = {
   totalAmount: $('totalAmount'), averagePulls: $('averagePulls'), searchInput: $('searchInput'), yearFilter: $('yearFilter'),
   characterFilter: $('characterFilter'), typeFilter: $('typeFilter'), recordFilter: $('recordFilter'), poolGrid: $('poolGrid'),
   emptyState: $('emptyState'), listSummary: $('listSummary'), editorModal: $('editorModal'), closeModalButton: $('closeModalButton'),
-  editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'), editorCharacters: $('editorCharacters'),
+  editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'), editorCharacters: $('editorCharacters'), cardRankList: $('cardRankList'),
   recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), amountInput: $('amountInput'), luckPreview: $('luckPreview'),
   deleteRecordButton: $('deleteRecordButton'), saveRecordButton: $('saveRecordButton'), recordMessage: $('recordMessage'), toast: $('toast'),
 }
 
-const TYPE_LABELS = { single: '單人卡池', multi: '多人卡池', daily: '日卡', free: '免費五星' }
+const TYPE_LABELS = { single: '月卡', multi: '混池', daily: '日卡' }
 const RANK_LABELS = ['0階', '1階', '2階', '疊滿']
 
 function formatMoney(value) { return Number(value || 0).toLocaleString('zh-TW') }
@@ -207,9 +207,17 @@ function getFilteredPools() {
   })
 }
 
+function getAcquiredCopies(record) {
+  return (Array.isArray(record?.cards) ? record.cards : []).reduce((sum, card) => {
+    const rank = Number(card?.rank)
+    return Number.isInteger(rank) && rank >= 0 && rank <= 3 ? sum + rank + 1 : sum
+  }, 0)
+}
+
 function getLuck(record) {
   if (!record || Number(record.pull_count) <= 0) return null
-  const copies = Math.min(4, Math.max(1, Number(record.rank || 0) + 1))
+  const copies = getAcquiredCopies(record)
+  if (!copies) return null
   const avg = Number(record.pull_count) / copies
   let label = '普通發揮', tone = 'normal'
   if (avg <= 40) { label = '超歐 ✦'; tone = 'lucky' }
@@ -217,7 +225,17 @@ function getLuck(record) {
   else if (avg <= 85) { label = '普通發揮'; tone = 'normal' }
   else if (avg <= 110) { label = '偏非'; tone = 'unlucky' }
   else { label = '很有故事…'; tone = 'unlucky' }
-  return { label, tone, average: avg }
+  return { label, tone, average: avg, copies }
+}
+
+function getPoolCards(pool) {
+  const cards = Array.isArray(pool?.cards) ? pool.cards : []
+  return cards.length ? cards : [{ cardKey: 'card:0', cardIndex: 0, label: pool?.characters?.[0] || '卡片 1', imageUrl: pool?.images?.[0] || '' }]
+}
+
+function getSavedRank(record, cardKey) {
+  const card = (record?.cards || []).find((item) => item.card_key === cardKey || item.cardKey === cardKey)
+  return card && Number.isInteger(Number(card.rank)) ? Number(card.rank) : null
 }
 
 function renderStats() {
@@ -228,7 +246,8 @@ function renderStats() {
   els.totalPoolCount.textContent = state.pools.length.toLocaleString('zh-TW')
   els.totalPulls.textContent = totalPulls.toLocaleString('zh-TW')
   els.totalAmount.textContent = formatMoney(totalAmount)
-  els.averagePulls.textContent = records.length ? Math.round(totalPulls / records.length).toLocaleString('zh-TW') : '0'
+  const totalCopies = records.reduce((sum, record) => sum + getAcquiredCopies(record), 0)
+  els.averagePulls.textContent = totalCopies ? Math.round(totalPulls / totalCopies).toLocaleString('zh-TW') : '0'
 }
 
 function poolCard(pool) {
@@ -255,8 +274,8 @@ function poolCard(pool) {
         <div class="pool-characters">${escapeHtml(chars)}</div>
         ${record ? `
           <div class="record-summary" data-open-editor="${escapeHtml(pool.poolKey)}">
-            <strong>${escapeHtml(RANK_LABELS[record.rank] || '0階')} · ${Number(record.pull_count || 0).toLocaleString('zh-TW')} 抽 · NT$ ${formatMoney(record.amount_twd)}</strong>
-            ${luck ? `<span class="luck-pill ${luck.tone === 'unlucky' ? 'unlucky' : ''}">${escapeHtml(luck.label)}｜平均 ${Math.round(luck.average)} 抽/張</span>` : '<span>尚未輸入抽數</span>'}
+            <strong>${getAcquiredCopies(record)} 張 · ${Number(record.pull_count || 0).toLocaleString('zh-TW')} 抽 · NT$ ${formatMoney(record.amount_twd)}</strong>
+            ${luck ? `<span class="luck-pill ${luck.tone === 'unlucky' ? 'unlucky' : ''}">${escapeHtml(luck.label)}｜平均 ${Math.round(luck.average)} 抽/張</span>` : '<span>尚未勾選取得卡片或抽數</span>'}
           </div>` : `
           <div class="record-summary unrecorded" data-open-editor="${escapeHtml(pool.poolKey)}">＋ 新增這個卡池的紀錄</div>`}
       </div>
@@ -283,9 +302,23 @@ function openEditor(poolKey) {
   const image = pool.images?.[0]
   els.editorImage.style.backgroundImage = image ? `url("${String(image).replace(/"/g, '\\"')}")` : ''
   els.editorImage.classList.toggle('no-image', !image)
-  const rank = Number(record?.rank ?? 0)
-  const rankInput = els.recordForm.querySelector(`input[name="rank"][value="${rank}"]`)
-  if (rankInput) rankInput.checked = true
+  const cards = getPoolCards(pool)
+  els.cardRankList.innerHTML = cards.map((card) => {
+    const savedRank = getSavedRank(record, card.cardKey)
+    const image = card.imageUrl || ''
+    const label = card.label || `卡片 ${Number(card.cardIndex || 0) + 1}`
+    const options = [{ value: '', label: '未取得' }, ...RANK_LABELS.map((text, rank) => ({ value: String(rank), label: text }))]
+    return `
+      <article class="card-rank-item" data-card-key="${escapeHtml(card.cardKey)}" data-card-index="${Number(card.cardIndex || 0)}" data-card-label="${escapeHtml(label)}" data-card-image="${escapeHtml(image)}">
+        <div class="card-rank-thumb">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" loading="lazy" referrerpolicy="no-referrer" />` : '<span>✦</span>'}</div>
+        <div class="card-rank-info">
+          <strong>${escapeHtml(label)}</strong>
+          <div class="rank-options rank-options-five">
+            ${options.map((option) => `<label><input type="radio" name="rank-${Number(card.cardIndex || 0)}" value="${option.value}" ${String(savedRank ?? '') === option.value ? 'checked' : ''} /><span>${option.label}</span></label>`).join('')}
+          </div>
+        </div>
+      </article>`
+  }).join('')
   els.pullCountInput.value = record?.pull_count ?? ''
   els.amountInput.value = record?.amount_twd ?? ''
   els.deleteRecordButton.classList.toggle('hidden', !record)
@@ -301,23 +334,37 @@ function closeEditor() {
   state.editingPoolKey = null
 }
 
+function collectEditorCards() {
+  return [...els.cardRankList.querySelectorAll('.card-rank-item')].flatMap((item) => {
+    const selected = item.querySelector('input[type="radio"]:checked')
+    if (!selected || selected.value === '') return []
+    return [{
+      cardKey: item.dataset.cardKey,
+      cardIndex: Number(item.dataset.cardIndex || 0),
+      cardLabel: item.dataset.cardLabel || '',
+      imageUrl: item.dataset.cardImage || '',
+      rank: Number(selected.value),
+    }]
+  })
+}
+
 function updateLuckPreview() {
   const pulls = Number(els.pullCountInput.value || 0)
-  const rank = Number(els.recordForm.querySelector('input[name="rank"]:checked')?.value || 0)
-  if (!pulls) {
-    els.luckPreview.innerHTML = '<span>簡易運氣評估</span><strong>輸入抽數後就會幫你算 ✦</strong><small>依目前疊卡張數與平均抽數／張簡易估算。</small>'
+  const cards = collectEditorCards()
+  const copies = cards.reduce((sum, card) => sum + Number(card.rank) + 1, 0)
+  if (!pulls || !copies) {
+    els.luckPreview.innerHTML = '<span>簡易運氣評估</span><strong>勾選取得卡片並輸入抽數後就會幫你算 ✦</strong><small>0階=1張、1階=2張、2階=3張、疊滿=4張；日卡與混池會把各張卡分開加總。</small>'
     return
   }
-  const mock = { pull_count: pulls, rank }
-  const luck = getLuck(mock)
-  els.luckPreview.innerHTML = `<span>簡易運氣評估</span><strong>${escapeHtml(luck.label)}｜平均 ${Math.round(luck.average)} 抽 / 張</strong><small>這是紀錄器的簡易估算，不代表實際卡池機率判定。</small>`
+  const luck = getLuck({ pull_count: pulls, cards })
+  els.luckPreview.innerHTML = `<span>簡易運氣評估</span><strong>${escapeHtml(luck.label)}｜${copies} 張，平均 ${Math.round(luck.average)} 抽 / 張</strong><small>平均抽數 = 此卡池總抽數 ÷ 實際取得的五星卡總張數。</small>`
 }
 
 async function saveRecord(event) {
   event.preventDefault()
   const poolKey = state.editingPoolKey
   if (!poolKey) return
-  const rank = Number(els.recordForm.querySelector('input[name="rank"]:checked')?.value || 0)
+  const cards = collectEditorCards()
   const pullCount = Number(els.pullCountInput.value)
   const amountTwd = Number(els.amountInput.value)
   if (!Number.isInteger(pullCount) || pullCount < 0) return void (els.recordMessage.textContent = '抽數只能輸入 0 以上的整數。')
@@ -326,11 +373,11 @@ async function saveRecord(event) {
   setButtonLoading(els.saveRecordButton, true, '儲存中…')
   els.recordMessage.textContent = ''
   try {
-    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, rank, pullCount, amountTwd }) })
+    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, cards, pullCount, amountTwd }) })
     state.records.set(poolKey, {
       ...saved,
       pool_key: saved.pool_key || poolKey,
-      rank: Number(saved.rank ?? rank),
+      cards: Array.isArray(saved.cards) ? saved.cards : cards.map((card) => ({ card_key: card.cardKey, card_index: card.cardIndex, card_label: card.cardLabel, image_url: card.imageUrl, rank: card.rank })),
       pull_count: Number(saved.pull_count ?? pullCount),
       amount_twd: Number(saved.amount_twd ?? amountTwd),
     })
@@ -375,7 +422,7 @@ els.nicknameInput.addEventListener('input', sanitizeNickname)
 els.nicknameInput.addEventListener('compositionend', sanitizeNickname)
 els.pullCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateLuckPreview() })
 els.amountInput.addEventListener('input', sanitizePositiveInteger)
-els.recordForm.addEventListener('change', (event) => { if (event.target.name === 'rank') updateLuckPreview() })
+els.recordForm.addEventListener('change', (event) => { if (event.target.matches('.card-rank-item input[type="radio"]')) updateLuckPreview() })
 els.loginForm.addEventListener('submit', handleLogin)
 els.registerForm.addEventListener('submit', handleRegister)
 els.recordForm.addEventListener('submit', saveRecord)

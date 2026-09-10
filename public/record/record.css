@@ -118,7 +118,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .empty-state { padding: 34px; border-radius: 20px; text-align: center; color: var(--muted); }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 18px; background: rgba(20,25,43,.32); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.modal-card { position: relative; width: min(720px, 100%); max-height: min(850px, calc(100vh - 36px)); overflow: auto; border-radius: 27px; display: grid; grid-template-columns: .9fr 1.25fr; background: rgba(252,253,255,.96); }
+.modal-card { position: relative; width: min(940px, 100%); max-height: min(850px, calc(100vh - 36px)); overflow: auto; border-radius: 27px; display: grid; grid-template-columns: .72fr 1.55fr; background: rgba(252,253,255,.96); }
 .modal-close { position: absolute; top: 10px; right: 10px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.88); cursor: pointer; font-size: 22px; line-height: 1; }
 .editor-image { min-height: 100%; background: linear-gradient(135deg, rgba(109,92,255,.15), rgba(0,194,255,.14)); background-size: cover; background-position: center; }
 .editor-content { padding: 30px 27px 25px; }
@@ -127,7 +127,15 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .editor-form { display: grid; gap: 18px; }
 .rank-fieldset { margin: 0; padding: 0; border: 0; }
 .rank-fieldset legend { margin-bottom: 8px; }
+.rank-help { margin: -2px 0 10px; color: var(--muted); font-size: 11px; }
+.card-rank-list { display: grid; gap: 10px; }
+.card-rank-item { display: grid; grid-template-columns: 92px minmax(0,1fr); gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.58); }
+.card-rank-thumb { width: 92px; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: linear-gradient(135deg, rgba(109,92,255,.10), rgba(0,194,255,.10)); color: var(--muted); }
+.card-rank-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.card-rank-info { min-width: 0; display: grid; gap: 8px; }
+.card-rank-info > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .rank-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.rank-options-five { grid-template-columns: repeat(5, minmax(0,1fr)); }
 .rank-options input { position: absolute; opacity: 0; pointer-events: none; }
 .rank-options span { display: grid; place-items: center; min-height: 41px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.8); cursor: pointer; font-size: 13px; font-weight: 750; }
 .rank-options input:checked + span { border-color: rgba(109,92,255,.5); background: rgba(109,92,255,.10); color: var(--brand-dark); box-shadow: inset 0 0 0 1px rgba(109,92,255,.12); }
@@ -170,6 +178,8 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   .modal-card { grid-template-columns: 1fr; max-height: calc(100vh - 18px); }
   .editor-image { min-height: 190px; }
   .editor-content { padding: 20px 16px 18px; }
-  .rank-options { grid-template-columns: repeat(2,1fr); }
+  .rank-options, .rank-options-five { grid-template-columns: repeat(2,1fr); }
+  .card-rank-item { grid-template-columns: 72px minmax(0,1fr); }
+  .card-rank-thumb { width: 72px; }
   .number-grid { grid-template-columns: 1fr; }
 }

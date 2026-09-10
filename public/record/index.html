@@ -94,7 +94,7 @@
             <strong><small>NT$ </small><b id="totalAmount">0</b></strong>
           </article>
           <article class="stat-card glass-card">
-            <span>平均每池</span>
+            <span>平均抽數 / 張</span>
             <strong><b id="averagePulls">0</b><small> 抽</small></strong>
           </article>
         </section>
@@ -109,10 +109,9 @@
             <select id="characterFilter" aria-label="角色"><option value="all">全部角色</option></select>
             <select id="typeFilter" aria-label="卡池類型">
               <option value="all">全部類型</option>
-              <option value="single">單人卡池</option>
-              <option value="multi">多人卡池</option>
+              <option value="single">月卡</option>
+              <option value="multi">混池</option>
               <option value="daily">日卡</option>
-              <option value="free">免費五星</option>
             </select>
             <select id="recordFilter" aria-label="紀錄狀態">
               <option value="all">全部卡池</option>
@@ -146,13 +145,9 @@
 
           <form id="recordForm" class="editor-form" novalidate>
             <fieldset class="rank-fieldset">
-              <legend>疊卡層級</legend>
-              <div class="rank-options">
-                <label><input type="radio" name="rank" value="0" checked /><span>0階</span></label>
-                <label><input type="radio" name="rank" value="1" /><span>1階</span></label>
-                <label><input type="radio" name="rank" value="2" /><span>2階</span></label>
-                <label><input type="radio" name="rank" value="3" /><span>疊滿</span></label>
-              </div>
+              <legend>卡片取得與疊卡層級</legend>
+              <p class="rank-help">月卡 1 張；日卡 2 張；混池依卡池圖片數量分開紀錄。沒有抽到的卡片保持「未取得」即可。</p>
+              <div id="cardRankList" class="card-rank-list"></div>
             </fieldset>
 
             <div class="number-grid">
