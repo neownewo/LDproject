@@ -1,9 +1,9 @@
-import { validateAccount } from './_lib/auth.js'
+import { findUserById } from './_lib/supabase.js'
 
 export default function handler(req, res) {
   return res.status(200).json({
     ok: true,
-    authLoaded: true,
-    testResult: validateAccount('test123')
+    supabaseLoaded: true,
+    functionExists: typeof findUserById === 'function'
   })
 }
