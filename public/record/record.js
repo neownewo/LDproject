@@ -14,11 +14,11 @@ const els = {
   loginButton: $('loginButton'), registerButton: $('registerButton'), loginMessage: $('loginMessage'), registerMessage: $('registerMessage'),
   registerAccountPreview: $('registerAccountPreview'), backToLoginButton: $('backToLoginButton'), nicknameDisplay: $('nicknameDisplay'),
   logoutButton: $('logoutButton'), recordedPoolCount: $('recordedPoolCount'), totalPoolCount: $('totalPoolCount'), totalPulls: $('totalPulls'),
-  totalAmount: $('totalAmount'), averagePulls: $('averagePulls'), searchInput: $('searchInput'), yearFilter: $('yearFilter'),
+  totalAmount: $('totalAmount'), totalGoldCount: $('totalGoldCount'), averagePulls: $('averagePulls'), searchInput: $('searchInput'), yearFilter: $('yearFilter'),
   characterFilter: $('characterFilter'), typeFilter: $('typeFilter'), recordFilter: $('recordFilter'), poolGrid: $('poolGrid'),
   emptyState: $('emptyState'), listSummary: $('listSummary'), editorModal: $('editorModal'), closeModalButton: $('closeModalButton'),
-  editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'),  cardRankList: $('cardRankList'),
-  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), amountInput: $('amountInput'), luckPreview: $('luckPreview'),
+  editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'), cardRankList: $('cardRankList'),
+  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), goldCountInput: $('goldCountInput'), amountInput: $('amountInput'), luckPreview: $('luckPreview'),
   deleteRecordButton: $('deleteRecordButton'), saveRecordButton: $('saveRecordButton'), recordMessage: $('recordMessage'), toast: $('toast'),
 }
 
@@ -214,18 +214,23 @@ function getAcquiredCopies(record) {
   }, 0)
 }
 
+function getGoldCount(record) {
+  const value = Number(record?.gold_count)
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
 function getLuck(record) {
   if (!record || Number(record.pull_count) <= 0) return null
-  const copies = getAcquiredCopies(record)
-  if (!copies) return null
-  const avg = Number(record.pull_count) / copies
+  const goldCount = getGoldCount(record)
+  if (!goldCount) return null
+  const avg = Number(record.pull_count) / goldCount
   let label = '普通發揮', tone = 'normal'
   if (avg <= 40) { label = '超歐 ✦'; tone = 'lucky' }
   else if (avg <= 60) { label = '偏歐'; tone = 'lucky' }
   else if (avg <= 85) { label = '普通發揮'; tone = 'normal' }
   else if (avg <= 110) { label = '偏非'; tone = 'unlucky' }
   else { label = '很有故事…'; tone = 'unlucky' }
-  return { label, tone, average: avg, copies }
+  return { label, tone, average: avg, goldCount }
 }
 
 function getPoolCards(pool) {
@@ -248,14 +253,15 @@ function renderStats() {
 
   const totalPulls = records.reduce((sum, record) => sum + Number(record.pull_count || 0), 0)
   const totalAmount = records.reduce((sum, record) => sum + Number(record.amount_twd || 0), 0)
-  const totalCopies = records.reduce((sum, record) => sum + getAcquiredCopies(record), 0)
+  const totalGoldCount = records.reduce((sum, record) => sum + getGoldCount(record), 0)
 
   els.recordedPoolCount.textContent = records.length.toLocaleString('zh-TW')
   els.totalPoolCount.textContent = filteredPools.length.toLocaleString('zh-TW')
   els.totalPulls.textContent = totalPulls.toLocaleString('zh-TW')
+  els.totalGoldCount.textContent = totalGoldCount.toLocaleString('zh-TW')
   els.totalAmount.textContent = formatMoney(totalAmount)
-  els.averagePulls.textContent = totalCopies
-    ? Math.round(totalPulls / totalCopies).toLocaleString('zh-TW')
+  els.averagePulls.textContent = totalGoldCount
+    ? Math.round(totalPulls / totalGoldCount).toLocaleString('zh-TW')
     : '0'
 }
 
@@ -283,8 +289,8 @@ function poolCard(pool) {
         <div class="pool-characters">${escapeHtml(chars)}</div>
         ${record ? `
           <div class="record-summary" data-open-editor="${escapeHtml(pool.poolKey)}">
-            <strong>${getAcquiredCopies(record)} 張 · ${Number(record.pull_count || 0).toLocaleString('zh-TW')} 抽 · NT$ ${formatMoney(record.amount_twd)}</strong>
-            ${luck ? `<span class="luck-pill ${luck.tone === 'unlucky' ? 'unlucky' : ''}">${escapeHtml(luck.label)}｜平均 ${Math.round(luck.average)} 抽/張</span>` : '<span>尚未勾選取得卡片或抽數</span>'}
+            <strong>限定 ${getAcquiredCopies(record)} 張 · 出金 ${getGoldCount(record)} 次 · ${Number(record.pull_count || 0).toLocaleString('zh-TW')} 抽 · NT$ ${formatMoney(record.amount_twd)}</strong>
+            ${luck ? `<span class="luck-pill ${luck.tone === 'unlucky' ? 'unlucky' : ''}">${escapeHtml(luck.label)}｜平均 ${Math.round(luck.average)} 抽/張五星</span>` : '<span>輸入抽數與出金總次數後即可評估歐非</span>'}
           </div>` : `
           <div class="record-summary unrecorded" data-open-editor="${escapeHtml(pool.poolKey)}">＋ 新增這個卡池的紀錄</div>`}
       </div>
@@ -307,7 +313,6 @@ function openEditor(poolKey) {
   const record = state.records.get(poolKey)
   els.editorTitle.textContent = pool.name
   els.editorMeta.textContent = `${getYear(pool)} · ${TYPE_LABELS[pool.poolType] || '卡池'} · ${formatDate(pool.startDate)} ～ ${formatDate(pool.endDate)}`
-  
   const image = pool.images?.[0]
   els.editorImage.style.backgroundImage = image ? `url("${String(image).replace(/"/g, '\\"')}")` : ''
   els.editorImage.classList.toggle('no-image', !image)
@@ -329,6 +334,7 @@ function openEditor(poolKey) {
       </article>`
   }).join('')
   els.pullCountInput.value = record?.pull_count ?? ''
+  els.goldCountInput.value = record?.gold_count ?? ''
   els.amountInput.value = record?.amount_twd ?? ''
   els.deleteRecordButton.classList.toggle('hidden', !record)
   els.recordMessage.textContent = ''
@@ -359,14 +365,27 @@ function collectEditorCards() {
 
 function updateLuckPreview() {
   const pulls = Number(els.pullCountInput.value || 0)
+  const goldCount = Number(els.goldCountInput.value || 0)
   const cards = collectEditorCards()
-  const copies = cards.reduce((sum, card) => sum + Number(card.rank) + 1, 0)
-  if (!pulls || !copies) {
-    els.luckPreview.innerHTML = '<span>簡易運氣評估</span><strong>勾選取得卡片並輸入抽數後就會幫你算 ✦</strong><small>0階=1張、1階=2張、2階=3張、疊滿=4張；日卡與混池會把各張卡分開加總。</small>'
+  const limitedCopies = cards.reduce((sum, card) => sum + Number(card.rank) + 1, 0)
+  const limitedAverage = pulls > 0 && limitedCopies > 0
+    ? Math.round(pulls / limitedCopies)
+    : null
+
+  if (!pulls || !goldCount) {
+    const limitedText = limitedAverage !== null
+      ? `限定卡運氣｜目前 ${limitedCopies} 張｜平均 ${limitedAverage} 抽 / 張限定卡`
+      : '限定卡運氣｜尚未取得限定卡'
+    els.luckPreview.innerHTML = `<span>簡易運氣評估</span><strong>輸入抽數與出金總次數後就會幫你算 ✦</strong><small>整體出金運氣會把限定卡與歪卡都算進去。</small><small class="limited-luck-note">${limitedText}（依疊卡層級換算）</small>`
     return
   }
-  const luck = getLuck({ pull_count: pulls, cards })
-  els.luckPreview.innerHTML = `<span>簡易運氣評估</span><strong>${escapeHtml(luck.label)}｜${copies} 張，平均 ${Math.round(luck.average)} 抽 / 張</strong><small>平均抽數 = 此卡池總抽數 ÷ 實際取得的五星卡總張數。</small>`
+
+  const luck = getLuck({ pull_count: pulls, gold_count: goldCount })
+  const limitedText = limitedAverage !== null
+    ? `限定卡運氣｜目前 ${limitedCopies} 張｜平均 ${limitedAverage} 抽 / 張限定卡`
+    : '限定卡運氣｜尚未取得限定卡'
+
+  els.luckPreview.innerHTML = `<span>簡易運氣評估</span><strong>${escapeHtml(luck.label)}｜出金 ${goldCount} 次｜平均 ${Math.round(luck.average)} 抽 / 張五星</strong><small>整體出金運氣：限定卡＋歪卡的五星都算。</small><small class="limited-luck-note">${limitedText}（依疊卡層級換算）</small>`
 }
 
 async function saveRecord(event) {
@@ -375,19 +394,25 @@ async function saveRecord(event) {
   if (!poolKey) return
   const cards = collectEditorCards()
   const pullCount = Number(els.pullCountInput.value)
+  const goldCount = Number(els.goldCountInput.value)
   const amountTwd = Number(els.amountInput.value)
+  const limitedCopies = cards.reduce((sum, card) => sum + Number(card.rank) + 1, 0)
   if (!Number.isInteger(pullCount) || pullCount < 0) return void (els.recordMessage.textContent = '抽數只能輸入 0 以上的整數。')
+  if (!Number.isInteger(goldCount) || goldCount < 0) return void (els.recordMessage.textContent = '出金總次數只能輸入 0 以上的整數。')
+  if (goldCount > pullCount) return void (els.recordMessage.textContent = '出金總次數不能大於總抽數。')
+  if (goldCount < limitedCopies) return void (els.recordMessage.textContent = `出金總次數至少要 ${limitedCopies} 次，因為你已紀錄取得 ${limitedCopies} 張限定五星。`)
   if (!Number.isInteger(amountTwd) || amountTwd < 0) return void (els.recordMessage.textContent = '課金金額只能輸入 0 以上的整數。')
 
   setButtonLoading(els.saveRecordButton, true, '儲存中…')
   els.recordMessage.textContent = ''
   try {
-    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, cards, pullCount, amountTwd }) })
+    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, cards, pullCount, goldCount, amountTwd }) })
     state.records.set(poolKey, {
       ...saved,
       pool_key: saved.pool_key || poolKey,
       cards: Array.isArray(saved.cards) ? saved.cards : cards.map((card) => ({ card_key: card.cardKey, card_index: card.cardIndex, card_label: card.cardLabel, image_url: card.imageUrl, rank: card.rank })),
       pull_count: Number(saved.pull_count ?? pullCount),
+      gold_count: Number(saved.gold_count ?? goldCount),
       amount_twd: Number(saved.amount_twd ?? amountTwd),
     })
     renderAll()
@@ -430,6 +455,7 @@ els.hunterCodeInput.addEventListener('input', sanitizeDigits)
 els.nicknameInput.addEventListener('input', sanitizeNickname)
 els.nicknameInput.addEventListener('compositionend', sanitizeNickname)
 els.pullCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateLuckPreview() })
+els.goldCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateLuckPreview() })
 els.amountInput.addEventListener('input', sanitizePositiveInteger)
 els.recordForm.addEventListener('change', (event) => { if (event.target.matches('.card-rank-item input[type="radio"]')) updateLuckPreview() })
 els.loginForm.addEventListener('submit', handleLogin)

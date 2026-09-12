@@ -174,10 +174,13 @@ async function handleRecords(req, res) {
     }
 
     const pullCount = parseInteger(body.pullCount)
+    const goldCount = parseInteger(body.goldCount)
     const amountTwd = parseInteger(body.amountTwd)
     const rawCards = Array.isArray(body.cards) ? body.cards : []
 
     if (pullCount === null || pullCount < 0 || pullCount > 1000000) return sendError(res, 400, 'INVALID_PULL_COUNT', '抽數不正確。')
+    if (goldCount === null || goldCount < 0 || goldCount > 1000000) return sendError(res, 400, 'INVALID_GOLD_COUNT', '出金總次數不正確。')
+    if (goldCount > pullCount) return sendError(res, 400, 'INVALID_GOLD_COUNT', '出金總次數不能大於總抽數。')
     if (amountTwd === null || amountTwd < 0 || amountTwd > 100000000) return sendError(res, 400, 'INVALID_AMOUNT', '課金金額不正確。')
     if (rawCards.length > 20) return sendError(res, 400, 'INVALID_CARDS', '卡片紀錄數量不正確。')
 
@@ -199,8 +202,11 @@ async function handleRecords(req, res) {
       cards.push({ cardKey, cardIndex, cardLabel, imageUrl, rank })
     }
 
-    const saved = await upsertRecordEntry(session.userId, { poolKey, pullCount, amountTwd, cards })
-    return res.status(200).json(saved || { pool_key: poolKey, pull_count: pullCount, amount_twd: amountTwd, cards })
+    const limitedCopies = cards.reduce((sum, card) => sum + card.rank + 1, 0)
+    if (goldCount < limitedCopies) return sendError(res, 400, 'INVALID_GOLD_COUNT', `出金總次數至少要 ${limitedCopies} 次。`)
+
+    const saved = await upsertRecordEntry(session.userId, { poolKey, pullCount, goldCount, amountTwd, cards })
+    return res.status(200).json(saved || { pool_key: poolKey, pull_count: pullCount, gold_count: goldCount, amount_twd: amountTwd, cards })
   } catch (error) {
     console.error('record records failed', error)
     return sendError(res, 500, 'RECORD_FAILED', '紀錄儲存失敗，請稍後再試。')

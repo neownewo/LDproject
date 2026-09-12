@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f7f9ff" />
     <meta name="description" content="戀與深空抽卡紀錄器：紀錄每個卡池的抽數、疊卡層級與課金金額。" />
     <title>抽卡紀錄器｜戀與深空攻略情報</title>
@@ -26,7 +26,7 @@
             <label class="field">
               <span>帳號</span>
               <input id="accountInput" autocomplete="username" maxlength="50" inputmode="text" placeholder="僅限英文字母與數字" required />
-              <small>登入帳號不會顯示在紀錄頁面，建議不要用公開社群帳號完整貼上避免被他人猜測成功。</small>
+              <small>登入帳號不會顯示在紀錄頁面。</small>
             </label>
 
             <label class="field">
@@ -90,11 +90,15 @@
             <strong><b id="totalPulls">0</b><small> 抽</small></strong>
           </article>
           <article class="stat-card glass-card">
+            <span>總出金</span>
+            <strong><b id="totalGoldCount">0</b><small> 次</small></strong>
+          </article>
+          <article class="stat-card glass-card">
             <span>總課金</span>
             <strong><small>NT$ </small><b id="totalAmount">0</b></strong>
           </article>
           <article class="stat-card glass-card">
-            <span>平均抽數 / 張</span>
+            <span>平均幾抽一張五星</span>
             <strong><b id="averagePulls">0</b><small> 抽</small></strong>
           </article>
         </section>
@@ -145,6 +149,7 @@
           <form id="recordForm" class="editor-form" novalidate>
             <fieldset class="rank-fieldset">
               <legend>卡片取得與疊卡層級</legend>
+              <p class="rank-help">月卡 1 張；日卡 2 張；混池依卡池圖片數量分開紀錄。沒有抽到的卡片保持「未取得」即可。</p>
               <div id="cardRankList" class="card-rank-list"></div>
             </fieldset>
 
@@ -154,15 +159,21 @@
                 <div class="input-suffix"><input id="pullCountInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required /><em>抽</em></div>
               </label>
               <label class="field">
+                <span>出金總次數</span>
+                <div class="input-suffix"><input id="goldCountInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required /><em>次</em></div>
+              </label>
+              <label class="field">
                 <span>課金金額</span>
                 <div class="input-prefix"><em>NT$</em><input id="amountInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required /></div>
               </label>
             </div>
+            <p class="gold-count-help">✦ 出金總次數：限定卡＋歪卡的五星都算</p>
 
             <div id="luckPreview" class="luck-preview">
               <span>簡易運氣評估</span>
-              <strong>輸入抽數後就會幫你算 ✦</strong>
-              <small>依目前疊卡張數與平均抽數／張簡易估算。</small>
+              <strong>輸入抽數與出金總次數後就會幫你算 ✦</strong>
+              <small>整體出金運氣：總抽數 ÷ 出金總次數（限定＋歪卡都算）。</small>
+              <small class="limited-luck-note">限定卡運氣：依疊卡層級換算限定卡張數，再計算平均幾抽 / 張限定卡。</small>
             </div>
 
             <p id="recordMessage" class="form-message" aria-live="polite"></p>

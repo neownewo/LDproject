@@ -165,7 +165,9 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .rank-options input { position: absolute; opacity: 0; pointer-events: none; }
 .rank-options span { display: grid; place-items: center; min-height: 41px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.8); cursor: pointer; font-size: 13px; font-weight: 750; }
 .rank-options input:checked + span { border-color: rgba(109,92,255,.5); background: rgba(109,92,255,.10); color: var(--brand-dark); box-shadow: inset 0 0 0 1px rgba(109,92,255,.12); }
-.number-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.number-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.gold-count-help { margin: -10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
 .input-suffix, .input-prefix { position: relative; }
 .input-suffix input { padding-right: 44px; }
 .input-prefix input { padding-left: 50px; }
@@ -176,6 +178,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .luck-preview > span { color: var(--muted); font-size: 11px; }
 .luck-preview strong { font-size: 14px; }
 .luck-preview small { color: var(--muted); font-size: 10px; }
+.luck-preview .limited-luck-note { margin-top: 3px; padding-top: 5px; border-top: 1px solid rgba(109,92,255,.10); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 9px; }
 .modal-actions .primary-button { min-width: 130px; }
 .danger-button { border-radius: 999px; padding: 10px 15px; border: 1px solid rgba(194,59,98,.18); color: var(--danger); background: rgba(194,59,98,.07); }

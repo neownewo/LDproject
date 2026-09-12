@@ -94,7 +94,6 @@ async function handleGachaCollection(req, res) {
   if (!requireAdmin(req, res)) return
   if (!onlyMethods(req, res, ['GET', 'POST', 'PATCH', 'DELETE'])) return
 
-  // 編輯 / 刪除改用 ?id=UUID，避免 Vercel 對 /gacha/:id 的 nested catch-all 路由出現 404。
   if (req.method === 'PATCH' || req.method === 'DELETE') {
     const id = Array.isArray(req.query?.id) ? req.query.id[0] : req.query?.id
     return handleGachaItem(req, res, id)
@@ -162,7 +161,7 @@ async function handleRecordAnalytics(req, res) {
   try {
     const [users, records, cardRows, poolRows] = await Promise.all([
       dbRequest('record_users?select=id,account,nickname,created_at,last_login_at&order=created_at.desc'),
-      dbRequest('gacha_records?select=id,user_id,pool_key,pull_count,amount_twd,created_at,updated_at&order=updated_at.desc'),
+      dbRequest('gacha_records?select=id,user_id,pool_key,pull_count,gold_count,amount_twd,created_at,updated_at&order=updated_at.desc'),
       dbRequest('gacha_record_cards?select=record_id,rank'),
       getRecordPools().catch(() => []),
     ])
@@ -181,14 +180,20 @@ async function handleRecordAnalytics(req, res) {
       lastLoginAt: user.last_login_at,
       recordCount: 0,
       totalPulls: 0,
+      totalGoldCount: 0,
       totalAmount: 0,
       totalCopies: 0,
     }]))
 
     const poolGroups = new Map()
+    for (const pool of (Array.isArray(poolRows) ? poolRows : [])) {
+      poolGroups.set(pool.poolKey, [])
+    }
+
     for (const record of safeRecords) {
       const pulls = Number(record.pull_count) || 0
       const amount = Number(record.amount_twd) || 0
+      const goldCount = Number(record.gold_count) || 0
       const copies = copiesByRecord.get(record.id) || 0
       const user = userById.get(record.user_id)
       const userName = user?.nickname || user?.account || '未知使用者'
@@ -202,6 +207,7 @@ async function handleRecordAnalytics(req, res) {
           lastLoginAt: user?.last_login_at || '',
           recordCount: 0,
           totalPulls: 0,
+          totalGoldCount: 0,
           totalAmount: 0,
           totalCopies: 0,
         })
@@ -209,6 +215,7 @@ async function handleRecordAnalytics(req, res) {
       const u = userStats.get(record.user_id)
       u.recordCount += 1
       u.totalPulls += pulls
+      u.totalGoldCount += goldCount
       u.totalAmount += amount
       u.totalCopies += copies
 
@@ -218,9 +225,10 @@ async function handleRecordAnalytics(req, res) {
         nickname: userName,
         account: user?.account || '',
         pulls,
+        goldCount,
         amount,
         copies,
-        pullsPerCopy: copies > 0 ? pulls / copies : null,
+        pullsPerGold: goldCount > 0 ? pulls / goldCount : null,
       })
     }
 
@@ -228,13 +236,14 @@ async function handleRecordAnalytics(req, res) {
       const meta = poolByKey.get(poolKey)
       const totalPulls = entries.reduce((sum, row) => sum + row.pulls, 0)
       const totalAmount = entries.reduce((sum, row) => sum + row.amount, 0)
+      const totalGoldCount = entries.reduce((sum, row) => sum + row.goldCount, 0)
       const totalCopies = entries.reduce((sum, row) => sum + row.copies, 0)
-      const luckEntries = entries.filter((row) => row.pullsPerCopy !== null)
+      const luckEntries = entries.filter((row) => row.pullsPerGold !== null)
       const mostLucky = luckEntries.length
-        ? luckEntries.reduce((best, row) => row.pullsPerCopy < best.pullsPerCopy ? row : best)
+        ? luckEntries.reduce((best, row) => row.pullsPerGold < best.pullsPerGold ? row : best)
         : null
       const mostUnlucky = luckEntries.length
-        ? luckEntries.reduce((worst, row) => row.pullsPerCopy > worst.pullsPerCopy ? row : worst)
+        ? luckEntries.reduce((worst, row) => row.pullsPerGold > worst.pullsPerGold ? row : worst)
         : null
       const highestSpend = entries.length
         ? entries.reduce((best, row) => row.amount > best.amount ? row : best)
@@ -252,23 +261,26 @@ async function handleRecordAnalytics(req, res) {
         participantCount: entries.length,
         totalPulls,
         totalAmount,
+        totalGoldCount,
         totalCopies,
         averagePullsPerPerson: entries.length ? roundNumber(totalPulls / entries.length) : 0,
         averageAmountPerPerson: entries.length ? Math.round(totalAmount / entries.length) : 0,
-        averagePullsPerCopy: totalCopies ? roundNumber(totalPulls / totalCopies) : 0,
+        averagePullsPerGold: totalGoldCount ? roundNumber(totalPulls / totalGoldCount) : 0,
         mostLucky: mostLucky ? {
           nickname: mostLucky.nickname,
           account: mostLucky.account,
           pulls: mostLucky.pulls,
+          goldCount: mostLucky.goldCount,
           copies: mostLucky.copies,
-          pullsPerCopy: roundNumber(mostLucky.pullsPerCopy),
+          pullsPerGold: roundNumber(mostLucky.pullsPerGold),
         } : null,
         mostUnlucky: mostUnlucky ? {
           nickname: mostUnlucky.nickname,
           account: mostUnlucky.account,
           pulls: mostUnlucky.pulls,
+          goldCount: mostUnlucky.goldCount,
           copies: mostUnlucky.copies,
-          pullsPerCopy: roundNumber(mostUnlucky.pullsPerCopy),
+          pullsPerGold: roundNumber(mostUnlucky.pullsPerGold),
         } : null,
         highestSpend: highestSpend ? {
           nickname: highestSpend.nickname,
@@ -286,13 +298,14 @@ async function handleRecordAnalytics(req, res) {
     const usersResult = [...userStats.values()]
       .map((user) => ({
         ...user,
-        averagePullsPerCopy: user.totalCopies ? roundNumber(user.totalPulls / user.totalCopies) : 0,
+        averagePullsPerGold: user.totalGoldCount ? roundNumber(user.totalPulls / user.totalGoldCount) : 0,
       }))
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
 
     const activeUserIds = new Set(safeRecords.map((row) => row.user_id))
     const totalPulls = safeRecords.reduce((sum, row) => sum + (Number(row.pull_count) || 0), 0)
     const totalAmount = safeRecords.reduce((sum, row) => sum + (Number(row.amount_twd) || 0), 0)
+    const totalGoldCount = safeRecords.reduce((sum, row) => sum + (Number(row.gold_count) || 0), 0)
     const totalCopies = [...copiesByRecord.values()].reduce((sum, value) => sum + value, 0)
 
     return res.status(200).json({
@@ -300,11 +313,12 @@ async function handleRecordAnalytics(req, res) {
         accountCount: safeUsers.length,
         activeAccountCount: activeUserIds.size,
         recordCount: safeRecords.length,
-        poolCount: poolGroups.size,
+        poolCount: new Set(safeRecords.map((row) => row.pool_key)).size,
         totalPulls,
         totalAmount,
+        totalGoldCount,
         totalCopies,
-        averagePullsPerCopy: totalCopies ? roundNumber(totalPulls / totalCopies) : 0,
+        averagePullsPerGold: totalGoldCount ? roundNumber(totalPulls / totalGoldCount) : 0,
       },
       users: usersResult,
       pools: poolStats,
