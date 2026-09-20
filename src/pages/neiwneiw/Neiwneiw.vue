@@ -24,6 +24,7 @@
           <div class="header-actions">
             <router-link to="/gacha" class="ghost-link">查看公開頁</router-link>
             <a href="/record" target="_blank" rel="noopener" class="ghost-link">查看紀錄器</a>
+            <a href="/image-compressor.html" target="_blank" rel="noopener" class="ghost-link">壓縮圖片小工具</a>
             <button class="logout-btn" @click="logout">登出</button>
           </div>
         </header>
