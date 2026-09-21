@@ -329,6 +329,47 @@ async function handleRecordAnalytics(req, res) {
   }
 }
 
+
+function cleanLuckMessage(body) {
+  const minPercent = Number(body.min_percent)
+  const maxPercent = Number(body.max_percent)
+  const message = String(body.message || '').trim()
+  const targetUserId = String(body.target_user_id || '').trim() || null
+  const sortNo = Number(body.sort_no) || 0
+  if (!Number.isInteger(minPercent) || !Number.isInteger(maxPercent) || minPercent < 0 || maxPercent > 100 || minPercent > maxPercent) throw new Error('INVALID_PERCENT_RANGE')
+  if (!message || message.length > 120) throw new Error('INVALID_MESSAGE')
+  return { min_percent: minPercent, max_percent: maxPercent, message, target_user_id: targetUserId, enabled: body.enabled !== false, sort_no: sortNo, updated_at: new Date().toISOString() }
+}
+
+async function handleLuckMessages(req, res) {
+  if (!requireAdmin(req, res)) return
+  if (!onlyMethods(req, res, ['GET','POST','PATCH','DELETE'])) return
+  try {
+    if (req.method === 'GET') {
+      const [messages, users] = await Promise.all([
+        dbRequest('record_luck_messages?select=*&order=sort_no.asc,created_at.asc'),
+        dbRequest('record_users?select=id,account,nickname&order=nickname.asc'),
+      ])
+      return res.status(200).json({ messages: Array.isArray(messages) ? messages : [], users: Array.isArray(users) ? users : [] })
+    }
+    const id = Array.isArray(req.query?.id) ? req.query.id[0] : req.query?.id
+    if (req.method === 'POST') {
+      const payload = cleanLuckMessage(getJsonBody(req)); delete payload.updated_at
+      const rows = await dbRequest('record_luck_messages', { method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(payload) })
+      return res.status(201).json(rows?.[0] || null)
+    }
+    if (!id) return res.status(400).json({ error:'MISSING_ID' })
+    if (req.method === 'PATCH') {
+      const rows = await dbRequest(`record_luck_messages?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify(cleanLuckMessage(getJsonBody(req))) })
+      return res.status(200).json(rows?.[0] || null)
+    }
+    await dbRequest(`record_luck_messages?id=eq.${encodeURIComponent(id)}`, { method:'DELETE', headers:{Prefer:'return=minimal'} })
+    return res.status(200).json({ok:true})
+  } catch (error) {
+    console.error('luck message admin failed', error)
+    return res.status(400).json({ error: error.message || 'LUCK_MESSAGE_FAILED' })
+  }
+}
 async function handleUpload(req, res) {
   if (!requireAdmin(req, res)) return
   if (!onlyMethods(req, res, ['POST'])) return
@@ -362,6 +403,7 @@ export default async function handler(req, res) {
   if (parts.length === 1 && resource === 'session') return handleSession(req, res)
   if (parts.length === 1 && resource === 'gacha') return handleGachaCollection(req, res)
   if (parts.length === 1 && resource === 'records') return handleRecordAnalytics(req, res)
+  if (parts.length === 1 && resource === 'luck-messages') return handleLuckMessages(req, res)
   if (parts.length === 2 && resource === 'gacha') return handleGachaItem(req, res, id)
   if (parts.length === 1 && resource === 'upload') return handleUpload(req, res)
 

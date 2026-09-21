@@ -67,3 +67,8 @@ export function uploadAdminImage(payload) {
 export function fetchAdminRecordAnalytics() {
   return request('/api/neiwneiw/records')
 }
+
+export function fetchAdminLuckMessages() { return request('/api/neiwneiw/luck-messages') }
+export function createAdminLuckMessage(payload) { return request('/api/neiwneiw/luck-messages', { method: 'POST', body: JSON.stringify(payload) }) }
+export function updateAdminLuckMessage(id, payload) { return request(`/api/neiwneiw/luck-messages?id=${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(payload) }) }
+export function deleteAdminLuckMessage(id) { return request(`/api/neiwneiw/luck-messages?id=${encodeURIComponent(id)}`, { method: 'DELETE', body: '{}' }) }

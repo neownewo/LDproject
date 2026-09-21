@@ -5,6 +5,7 @@ const state = {
   pools: [],
   records: new Map(),
   editingPoolKey: null,
+  luckPercent: null,
 }
 
 const $ = (id) => document.getElementById(id)
@@ -18,7 +19,7 @@ const els = {
   characterFilter: $('characterFilter'), typeFilter: $('typeFilter'), recordFilter: $('recordFilter'), poolGrid: $('poolGrid'),
   emptyState: $('emptyState'), listSummary: $('listSummary'), editorModal: $('editorModal'), closeModalButton: $('closeModalButton'),
   editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'), cardRankList: $('cardRankList'),
-  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), goldCountInput: $('goldCountInput'), amountInput: $('amountInput'), recordNoteInput: $('recordNoteInput'), recordNoteCount: $('recordNoteCount'), luckPreview: $('luckPreview'),
+  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), goldCountInput: $('goldCountInput'), amountInput: $('amountInput'), recordNoteInput: $('recordNoteInput'), recordNoteCount: $('recordNoteCount'), luckPercentPanel: $('luckPercentPanel'), luckPercentValue: $('luckPercentValue'), luckPercentBar: $('luckPercentBar'), luckPercentMessage: $('luckPercentMessage'), luckPreview: $('luckPreview'),
   deleteRecordButton: $('deleteRecordButton'), saveRecordButton: $('saveRecordButton'), recordMessage: $('recordMessage'), toast: $('toast'),
 }
 
@@ -49,6 +50,35 @@ async function api(url, options = {}) {
   return data
 }
 
+
+function renderLuckPercent() {
+  const result = state.luckPercent
+  if (!els.luckPercentPanel || !els.luckPercentValue || !els.luckPercentBar || !els.luckPercentMessage) return
+  if (!result || !result.available) {
+    els.luckPercentValue.textContent = '—'
+    els.luckPercentBar.style.width = '0%'
+    els.luckPercentMessage.textContent = result?.message || '有更多抽卡紀錄後，就能看看你的歐氣落在哪裡 ✦'
+    return
+  }
+  const percent = Math.max(0, Math.min(100, Number(result.percent) || 0))
+  els.luckPercentValue.textContent = String(percent)
+  els.luckPercentBar.style.width = `${percent}%`
+  els.luckPercentMessage.textContent = result.message || '平穩發揮中 ✦'
+}
+
+async function refreshLuckPercent(poolKey = state.editingPoolKey) {
+  if (!poolKey) return
+  try {
+    const result = await api(`/api/record/luck?poolKey=${encodeURIComponent(poolKey)}`)
+    // 使用者可能在 API 回來前已切換或關閉卡池，避免舊結果蓋到新視窗。
+    if (state.editingPoolKey !== poolKey) return
+    state.luckPercent = result
+  } catch {
+    if (state.editingPoolKey !== poolKey) return
+    state.luckPercent = { available: false, message: '歐氣資料暫時讀取失敗 ✦' }
+  }
+  renderLuckPercent()
+}
 function setButtonLoading(button, loading, loadingText = '處理中…') {
   if (!button) return
   if (loading) {
@@ -341,8 +371,11 @@ function openEditor(poolKey) {
   els.deleteRecordButton.classList.toggle('hidden', !record)
   els.recordMessage.textContent = ''
   updateLuckPreview()
+  state.luckPercent = null
+  renderLuckPercent()
   els.editorModal.classList.remove('hidden')
   document.body.style.overflow = 'hidden'
+  refreshLuckPercent(poolKey)
 }
 
 function closeEditor() {

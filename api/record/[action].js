@@ -12,6 +12,7 @@ import {
 } from '../../lib/api/recordAuth.js'
 import {
   createRecordUser,
+  dbRequest,
   deleteRecordEntry,
   findRecordUserByAccount,
   findRecordUserById,
@@ -153,6 +154,63 @@ async function handlePools(req, res) {
   }
 }
 
+
+async function handleLuck(req, res) {
+  if (!onlyMethods(req, res, ['GET'])) return
+  const session = requireRecordUser(req, res)
+  if (!session) return
+
+  const rawPoolKey = Array.isArray(req.query?.poolKey) ? req.query.poolKey[0] : req.query?.poolKey
+  const poolKey = String(rawPoolKey || '').trim()
+  if (!validatePoolKey(poolKey)) return sendError(res, 400, 'INVALID_POOL', '卡池識別碼不正確。')
+
+  try {
+    // 歐氣百分比只比較「目前這一個卡池」，不同卡池不共用同一個全站平均。
+    const rows = await dbRequest(
+      `gacha_records?select=user_id,pull_count,gold_count&pool_key=eq.${encodeURIComponent(poolKey)}`,
+    )
+
+    const averages = new Map()
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const pulls = Number(row.pull_count) || 0
+      const gold = Number(row.gold_count) || 0
+      if (pulls <= 0 || gold <= 0) continue
+      averages.set(row.user_id, pulls / gold)
+    }
+
+    const myAverage = averages.get(session.userId)
+    if (!Number.isFinite(myAverage)) {
+      return res.status(200).json({ available: false, message: '完成這個卡池的抽卡紀錄後，就能看看你的歐氣 ✦' })
+    }
+
+    const others = [...averages.entries()]
+      .filter(([userId]) => userId !== session.userId)
+      .map(([, average]) => average)
+
+    if (!others.length) {
+      return res.status(200).json({ available: false, message: '這個卡池目前還沒有足夠資料可以比較 ✦' })
+    }
+
+    const worse = others.filter((average) => average > myAverage).length
+    // 文案寫的是『超越 X%』，因此只計算真的比目前使用者差的人；同分不算被超越。
+    const percent = Math.max(0, Math.min(100, Math.round((worse / others.length) * 100)))
+
+    // 指定梗只決定顯示文字，不參與、也不改動百分比計算。
+    const targeted = await dbRequest(`record_luck_messages?select=id,message,sort_no&enabled=eq.true&target_user_id=eq.${encodeURIComponent(session.userId)}&min_percent=lte.${percent}&max_percent=gte.${percent}&order=sort_no.asc`)
+    let candidates = Array.isArray(targeted) ? targeted : []
+    if (!candidates.length) {
+      const general = await dbRequest(`record_luck_messages?select=id,message,sort_no&enabled=eq.true&target_user_id=is.null&min_percent=lte.${percent}&max_percent=gte.${percent}&order=sort_no.asc`)
+      candidates = Array.isArray(general) ? general : []
+    }
+
+    const chosen = candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null
+    return res.status(200).json({ available: true, percent, message: chosen?.message || '平穩發揮中 ✦' })
+  } catch (error) {
+    console.error('record luck failed', error)
+    return sendError(res, 500, 'LUCK_FAILED', '歐氣資料讀取失敗。')
+  }
+}
+
 async function handleRecords(req, res) {
   if (!onlyMethods(req, res, ['GET', 'PUT', 'DELETE'])) return
   const session = requireRecordUser(req, res)
@@ -223,6 +281,7 @@ export default async function handler(req, res) {
     case 'logout': return handleLogout(req, res)
     case 'pools': return handlePools(req, res)
     case 'records': return handleRecords(req, res)
+    case 'luck': return handleLuck(req, res)
     default: return res.status(404).json({ error: 'NOT_FOUND' })
   }
 }

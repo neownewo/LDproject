@@ -243,3 +243,6 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   .card-rank-thumb { width: 72px; }
   .number-grid { grid-template-columns: 1fr; }
 }
+
+/* 歐氣百分比 */
+.luck-percent-panel{margin-top:12px;padding:14px 16px;border:1px solid var(--line);border-radius:15px;background:rgba(109,92,255,.045);text-align:center}.luck-percent-label{display:block;color:var(--muted);font-size:11px;font-weight:700}.luck-percent-panel strong{display:block;margin:3px 0 9px;font-size:20px;color:var(--brand-dark)}.luck-percent-track{height:7px;border-radius:999px;background:rgba(109,92,255,.12);overflow:hidden}.luck-percent-track i{display:block;width:0;height:100%;border-radius:inherit;background:var(--brand);transition:width .35s ease}.luck-percent-panel small{display:block;margin-top:8px;color:var(--muted);font-size:11px;line-height:1.5}

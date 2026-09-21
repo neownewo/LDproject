@@ -32,6 +32,7 @@
         <nav class="admin-tabs" aria-label="後台功能">
           <button :class="{ active: activeSection === 'gacha' }" @click="switchSection('gacha')">卡池管理</button>
           <button :class="{ active: activeSection === 'records' }" @click="switchSection('records')">抽卡紀錄器管理</button>
+          <button :class="{ active: activeSection === 'luck' }" @click="switchSection('luck')">歐氣文案管理</button>
         </nav>
 
         <template v-if="activeSection === 'gacha'">
@@ -106,7 +107,7 @@
           </section>
         </template>
 
-        <template v-else>
+        <template v-else-if="activeSection === 'records'">
           <section class="record-toolbar list-card">
             <div>
               <p class="eyebrow">GACHA RECORD ANALYTICS</p>
@@ -270,6 +271,76 @@
           <div v-else class="empty-state list-card">抽卡紀錄資料讀取失敗，請重新整理。</div>
         </template>
 
+        <template v-else-if="activeSection === 'luck'">
+          <section class="record-toolbar list-card">
+            <div>
+              <p class="eyebrow">LUCK MESSAGES</p>
+              <h2>歐氣文案管理</h2>
+              <p>維護一般文案與指定使用者文案；前台仍會從符合條件的文案中隨機顯示。</p>
+            </div>
+            <button class="refresh-btn" type="button" :disabled="loadingLuck" @click="loadLuckMessages">
+              {{ loadingLuck ? '讀取中…' : '重新整理' }}
+            </button>
+          </section>
+
+          <section class="list-card luck-admin-card">
+            <div class="list-head">
+              <div><p class="eyebrow">MESSAGE LIST</p><h2>文案列表</h2></div>
+              <button type="button" class="refresh-btn" @click="resetLuckForm">＋新增文案</button>
+            </div>
+
+            <div class="luck-filter-row">
+              <label class="filter-search">
+                <span class="search-icon" aria-hidden="true">⌕</span>
+                <input v-model.trim="luckKeyword" type="search" placeholder="搜尋文案、帳號或暱稱" />
+              </label>
+              <select v-model="luckTargetFilter" aria-label="套用對象篩選">
+                <option value="">全部對象</option>
+                <option value="general">所有人</option>
+                <option value="targeted">指定使用者</option>
+              </select>
+              <select v-model="luckEnabledFilter" aria-label="啟用狀態篩選">
+                <option value="">全部狀態</option>
+                <option value="enabled">啟用</option>
+                <option value="disabled">停用</option>
+              </select>
+              <label class="luck-percent-filter">
+                <span>百分比</span>
+                <input v-model="luckPercentFilter" type="number" min="0" max="100" placeholder="0–100" />
+              </label>
+            </div>
+
+            <div class="luck-message-form">
+              <label><span>最低百分比</span><input v-model.number="luckForm.min_percent" type="number" min="0" max="100" /></label>
+              <label><span>最高百分比</span><input v-model.number="luckForm.max_percent" type="number" min="0" max="100" /></label>
+              <label><span>套用對象</span><select v-model="luckForm.target_user_id"><option value="">所有人</option><option v-for="user in luckUsers" :key="user.id" :value="user.id">{{ user.nickname || '—' }}（{{ user.account }}）</option></select></label>
+              <label><span>排序</span><input v-model.number="luckForm.sort_no" type="number" step="1" /></label>
+              <label class="luck-message-input"><span>梗文案（最多 120 字）</span><input v-model.trim="luckForm.message" maxlength="120" type="text" placeholder="例如：深空正在考驗你的意志……" /></label>
+              <label class="luck-enabled"><input v-model="luckForm.enabled" type="checkbox" /> 啟用</label>
+              <div class="row-actions"><button type="button" :disabled="savingLuck" @click="saveLuckMessage">{{ savingLuck ? '儲存中…' : (luckForm.id ? '儲存修改' : '新增文案') }}</button><button v-if="luckForm.id" type="button" @click="resetLuckForm">取消編輯</button></div>
+            </div>
+
+            <div v-if="loadingLuck && !luckMessages.length" class="empty-state">歐氣文案載入中…</div>
+            <div v-else-if="!filteredLuckMessages.length" class="empty-state">沒有符合查詢條件的歐氣文案。</div>
+            <template v-else>
+              <div class="luck-message-list">
+                <article v-for="item in pagedLuckMessages" :key="item.id" class="luck-message-row">
+                  <div><strong>{{ item.min_percent }}～{{ item.max_percent }}%</strong><span :class="{ targeted: item.target_user_id }">{{ item.target_user_id ? `指定：${luckUserLabel(item.target_user_id)}` : '所有人' }}</span><small>{{ item.enabled ? '啟用' : '停用' }}</small></div>
+                  <p>{{ item.message }}</p>
+                  <div class="row-actions"><button type="button" @click="editLuckMessage(item)">編輯</button><button type="button" class="danger" @click="removeLuckMessage(item)">刪除</button></div>
+                </article>
+              </div>
+              <div class="account-pagination">
+                <span>共 {{ number(filteredLuckMessages.length) }} 筆・第 {{ safeLuckPage }} / {{ luckTotalPages }} 頁</span>
+                <div class="pagination-actions">
+                  <button type="button" :disabled="safeLuckPage <= 1" @click="luckPage = safeLuckPage - 1">上一頁</button>
+                  <button type="button" :disabled="safeLuckPage >= luckTotalPages" @click="luckPage = safeLuckPage + 1">下一頁</button>
+                </div>
+              </div>
+            </template>
+          </section>
+        </template>
+
         <p v-if="toast" class="toast">{{ toast }}</p>
       </template>
     </main>
@@ -285,6 +356,10 @@ import {
   deleteAdminGachaPool,
   fetchAdminGachaPools,
   fetchAdminRecordAnalytics,
+  fetchAdminLuckMessages,
+  createAdminLuckMessage,
+  updateAdminLuckMessage,
+  deleteAdminLuckMessage,
   getAdminSession,
   loginAdmin,
   logoutAdmin,
@@ -297,6 +372,7 @@ const working = ref(false)
 const saving = ref(false)
 const loadingPools = ref(false)
 const loadingRecords = ref(false)
+const loadingLuck = ref(false)
 const password = ref('')
 const errorMessage = ref('')
 const pools = ref([])
@@ -319,6 +395,16 @@ const recordYearFilter = ref('')
 const recordCharacterFilter = ref('')
 const recordTypeFilter = ref('')
 const recordStatusFilter = ref('')
+const luckMessages = ref([])
+const luckUsers = ref([])
+const savingLuck = ref(false)
+const luckKeyword = ref('')
+const luckTargetFilter = ref('')
+const luckEnabledFilter = ref('')
+const luckPercentFilter = ref('')
+const luckPage = ref(1)
+const luckPageSize = 10
+const luckForm = ref({ id:'', min_percent:0, max_percent:100, message:'', target_user_id:'', enabled:true, sort_no:0 })
 
 const publishedCount = computed(() => pools.value.filter((pool) => pool.is_published).length)
 
@@ -477,6 +563,36 @@ const filteredRecordPools = computed(() => {
   })
 })
 
+const filteredLuckMessages = computed(() => {
+  const q = luckKeyword.value.toLowerCase()
+  const percentRaw = String(luckPercentFilter.value ?? '').trim()
+  const percent = percentRaw === '' ? null : Number(percentRaw)
+
+  return luckMessages.value.filter((item) => {
+    const userLabel = item.target_user_id ? luckUserLabel(item.target_user_id) : '所有人'
+    const matchesKeyword = !q || `${item.message || ''} ${userLabel}`.toLowerCase().includes(q)
+    const matchesTarget = !luckTargetFilter.value
+      || (luckTargetFilter.value === 'general' && !item.target_user_id)
+      || (luckTargetFilter.value === 'targeted' && Boolean(item.target_user_id))
+    const matchesEnabled = !luckEnabledFilter.value
+      || (luckEnabledFilter.value === 'enabled' && Boolean(item.enabled))
+      || (luckEnabledFilter.value === 'disabled' && !item.enabled)
+    const matchesPercent = percent === null || Number.isNaN(percent)
+      || (percent >= Number(item.min_percent) && percent <= Number(item.max_percent))
+    return matchesKeyword && matchesTarget && matchesEnabled && matchesPercent
+  })
+})
+
+const luckTotalPages = computed(() => Math.max(1, Math.ceil(filteredLuckMessages.value.length / luckPageSize)))
+const safeLuckPage = computed(() => Math.min(luckPage.value, luckTotalPages.value))
+const pagedLuckMessages = computed(() => {
+  const start = (safeLuckPage.value - 1) * luckPageSize
+  return filteredLuckMessages.value.slice(start, start + luckPageSize)
+})
+
+watch([luckKeyword, luckTargetFilter, luckEnabledFilter, luckPercentFilter], () => { luckPage.value = 1 })
+watch(luckTotalPages, (pages) => { if (luckPage.value > pages) luckPage.value = pages })
+
 onMounted(async () => {
   try {
     const session = await getAdminSession()
@@ -514,6 +630,7 @@ async function logout() {
 async function switchSection(section) {
   activeSection.value = section
   if (section === 'records' && !recordAnalytics.value) await loadRecordAnalytics()
+  if (section === 'luck' && !luckMessages.value.length) await loadLuckMessages()
 }
 
 async function loadPools() {
@@ -538,6 +655,37 @@ async function loadRecordAnalytics() {
   } finally {
     loadingRecords.value = false
   }
+}
+
+async function loadLuckMessages() {
+  loadingLuck.value = true
+  try {
+    const data = await fetchAdminLuckMessages()
+    luckMessages.value = data.messages || []
+    luckUsers.value = data.users || []
+  } catch (error) {
+    if (error.status === 401) authenticated.value = false
+    else showToast(`歐氣文案讀取失敗：${error.message}`)
+  } finally {
+    loadingLuck.value = false
+  }
+}
+
+function resetLuckForm() { luckForm.value = { id:'', min_percent:0, max_percent:100, message:'', target_user_id:'', enabled:true, sort_no:0 } }
+function luckUserLabel(id) { const user = luckUsers.value.find((item) => item.id === id); return user ? `${user.nickname || '—'}（${user.account}）` : '未知帳號' }
+function editLuckMessage(item) { luckForm.value = { ...item, target_user_id: item.target_user_id || '' }; window.scrollTo({ top: 0, behavior:'smooth' }) }
+async function saveLuckMessage() {
+  if (!luckForm.value.message) return showToast('請輸入梗文案')
+  savingLuck.value = true
+  try {
+    const payload = { ...luckForm.value, target_user_id: luckForm.value.target_user_id || null }; delete payload.id
+    if (luckForm.value.id) await updateAdminLuckMessage(luckForm.value.id, payload); else await createAdminLuckMessage(payload)
+    await loadLuckMessages(); resetLuckForm(); showToast('歐氣文案已儲存')
+  } catch (error) { showToast(`文案儲存失敗：${error.message}`) } finally { savingLuck.value = false }
+}
+async function removeLuckMessage(item) {
+  if (!window.confirm(`確定刪除「${item.message}」嗎？`)) return
+  try { await deleteAdminLuckMessage(item.id); luckMessages.value = luckMessages.value.filter((row) => row.id !== item.id); if (luckForm.value.id === item.id) resetLuckForm(); showToast('文案已刪除') } catch (error) { showToast(`刪除失敗：${error.message}`) }
 }
 
 function toPayload(model) {
@@ -635,7 +783,9 @@ function showToast(text) {
 .filter-search{position:relative;display:block}
 .filter-search input{padding-left:37px}
 .search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#6e73a7;font-size:18px;pointer-events:none}
-.admin-filter-row select{appearance:auto;cursor:pointer}.record-toolbar p{margin-bottom:0}.refresh-btn:disabled{opacity:.55;cursor:wait}.pool-list{display:grid;gap:9px}.pool-row{display:grid;grid-template-columns:74px 1fr auto;gap:12px;align-items:center;border:1px solid #e6e8ee;border-radius:17px;padding:9px;background:#fff}.pool-row img,.thumb-empty{width:74px;height:74px;border-radius:12px;object-fit:contain;background:#f4f5fa}.thumb-empty{display:grid;place-items:center;color:#a4a8b1;font-size:10px}.pool-info h3{margin:5px 0 3px;font-size:15px}.pool-info p,.analytics-title p{margin:0;color:#7b8190;font-size:12px}.chips{display:flex;gap:5px;flex-wrap:wrap}.chips span{border-radius:999px;padding:2px 7px;background:#f0efff;color:#6966c8;font-size:10px;font-weight:900}.chips .published{background:#ebfaf4;color:#118361}.chips .draft{background:#f3f4f6;color:#777}.row-actions{display:flex;gap:5px}.row-actions button{font-size:11px}.row-actions .danger{color:#b42d47;border-color:#f0ccd3}.empty-state{border:1px dashed #d8dbe4;border-radius:15px;padding:22px;text-align:center;color:#7d828d}.table-scroll{overflow:auto;border:1px solid #e7e9ef;border-radius:16px}.admin-table{width:100%;min-width:940px;border-collapse:collapse;background:#fff}.admin-table th,.admin-table td{padding:11px 12px;border-bottom:1px solid #eceef3;text-align:left;white-space:nowrap;font-size:12px}.admin-table th{position:sticky;top:0;background:#f8f9fc;color:#717785;font-size:11px;z-index:1}.admin-table tbody tr:last-child td{border-bottom:0}.admin-table .num{text-align:right}.account-table-scroll{height:478px;min-height:478px;max-height:478px}.account-table th{height:42px;box-sizing:border-box}.account-table td{height:43px;box-sizing:border-box}.sort-head{display:inline-flex;align-items:center;gap:5px;border:0!important;background:transparent!important;padding:0!important;color:inherit!important;font:inherit;font-weight:800;cursor:pointer;box-shadow:none!important}.sort-head span{min-width:10px;color:#a0a5b0;font-size:9px}.num-sort{justify-content:flex-end;width:100%}.account-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;color:#7b8190;font-size:11px}.pagination-actions{display:flex;gap:7px}.pagination-actions button{min-width:72px}.pagination-actions button:disabled{opacity:.4;cursor:not-allowed}.account-empty{min-height:478px;display:grid;place-items:center;box-sizing:border-box}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#606675}.analytics-list{display:grid;gap:12px}.analytics-card{border:1px solid #e5e7ef;border-radius:20px;background:#fff;padding:16px}.analytics-title{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.analytics-title h3{margin:6px 0 4px}.analytics-total{text-align:right;color:#737988;font-size:11px}.analytics-total strong{display:block;margin-top:4px;color:#353947;font-size:17px}.pool-stat-grid,.extreme-grid{display:grid;gap:8px;margin-top:13px}.pool-stat-grid{grid-template-columns:repeat(4,1fr)}.pool-stat-grid>div,.extreme{border-radius:14px;background:#f7f8fb;padding:11px}.pool-stat-grid span,.extreme span{display:block;color:#888d98;font-size:10px;font-weight:800}.pool-stat-grid strong,.extreme strong{display:block;margin-top:3px;font-size:15px}.extreme-grid{grid-template-columns:repeat(4,1fr)}.extreme small{display:block;margin-top:4px;color:#858a96;font-size:10px}.extreme.lucky{background:#f2f0ff}.extreme.lucky strong{color:#6966c8}.extreme.unlucky{background:#fff3f5}.extreme.unlucky strong{color:#ad4155}.toast{position:fixed;right:20px;bottom:20px;border-radius:14px;padding:11px 16px;background:#222634;color:#fff;box-shadow:0 14px 30px rgba(0,0,0,.18);z-index:100}@media(max-width:900px){.record-summary-grid{grid-template-columns:repeat(2,1fr)}.pool-stat-grid,.extreme-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:760px){.admin-header,.list-head,.record-toolbar,.analytics-title{display:grid}.dashboard-grid{grid-template-columns:1fr 1fr 1fr}.pool-row{grid-template-columns:58px 1fr}.pool-row img,.thumb-empty{width:58px;height:58px}.row-actions{grid-column:1/-1;justify-content:flex-end}.admin-wrap{width:min(100% - 20px,1280px);padding-top:16px}.analytics-total{text-align:left}.admin-tabs{width:100%}.admin-tabs button{flex:1;padding-inline:10px}}@media(max-width:520px){.dashboard-grid,.record-summary-grid,.pool-stat-grid,.extreme-grid{grid-template-columns:1fr 1fr}.metric strong{font-size:21px}.list-card{padding:15px}}
+.admin-filter-row select{appearance:auto;cursor:pointer}.record-toolbar p{margin-bottom:0}.refresh-btn:disabled{opacity:.55;cursor:wait}.pool-list{display:grid;gap:9px}.pool-row{display:grid;grid-template-columns:74px 1fr auto;gap:12px;align-items:center;border:1px solid #e6e8ee;border-radius:17px;padding:9px;background:#fff}.pool-row img,.thumb-empty{width:74px;height:74px;border-radius:12px;object-fit:contain;background:#f4f5fa}.thumb-empty{display:grid;place-items:center;color:#a4a8b1;font-size:10px}.pool-info h3{margin:5px 0 3px;font-size:15px}.pool-info p,.analytics-title p{margin:0;color:#7b8190;font-size:12px}.chips{display:flex;gap:5px;flex-wrap:wrap}.chips span{border-radius:999px;padding:2px 7px;background:#f0efff;color:#6966c8;font-size:10px;font-weight:900}.chips .published{background:#ebfaf4;color:#118361}.chips .draft{background:#f3f4f6;color:#777}.row-actions{display:flex;gap:5px}.row-actions button{font-size:11px}.row-actions .danger{color:#b42d47;border-color:#f0ccd3}.empty-state{border:1px dashed #d8dbe4;border-radius:15px;padding:22px;text-align:center;color:#7d828d}.table-scroll{overflow:auto;border:1px solid #e7e9ef;border-radius:16px}.admin-table{width:100%;min-width:940px;border-collapse:collapse;background:#fff}.admin-table th,.admin-table td{padding:11px 12px;border-bottom:1px solid #eceef3;text-align:left;white-space:nowrap;font-size:12px}.admin-table th{position:sticky;top:0;background:#f8f9fc;color:#717785;font-size:11px;z-index:1}.admin-table tbody tr:last-child td{border-bottom:0}.admin-table .num{text-align:right}.account-table-scroll{height:478px;min-height:478px;max-height:478px}.account-table th{height:42px;box-sizing:border-box}.account-table td{height:43px;box-sizing:border-box}.sort-head{display:inline-flex;align-items:center;gap:5px;border:0!important;background:transparent!important;padding:0!important;color:inherit!important;font:inherit;font-weight:800;cursor:pointer;box-shadow:none!important}.sort-head span{min-width:10px;color:#a0a5b0;font-size:9px}.num-sort{justify-content:flex-end;width:100%}.account-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;color:#7b8190;font-size:11px}.pagination-actions{display:flex;gap:7px}.pagination-actions button{min-width:72px}.pagination-actions button:disabled{opacity:.4;cursor:not-allowed}.account-empty{min-height:478px;display:grid;place-items:center;box-sizing:border-box}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#606675}.analytics-list{display:grid;gap:12px}.analytics-card{border:1px solid #e5e7ef;border-radius:20px;background:#fff;padding:16px}.analytics-title{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.analytics-title h3{margin:6px 0 4px}.analytics-total{text-align:right;color:#737988;font-size:11px}.analytics-total strong{display:block;margin-top:4px;color:#353947;font-size:17px}.pool-stat-grid,.extreme-grid{display:grid;gap:8px;margin-top:13px}.pool-stat-grid{grid-template-columns:repeat(4,1fr)}.pool-stat-grid>div,.extreme{border-radius:14px;background:#f7f8fb;padding:11px}.pool-stat-grid span,.extreme span{display:block;color:#888d98;font-size:10px;font-weight:800}.pool-stat-grid strong,.extreme strong{display:block;margin-top:3px;font-size:15px}.extreme-grid{grid-template-columns:repeat(4,1fr)}.extreme small{display:block;margin-top:4px;color:#858a96;font-size:10px}.extreme.lucky{background:#f2f0ff}.extreme.lucky strong{color:#6966c8}.extreme.unlucky{background:#fff3f5}.extreme.unlucky strong{color:#ad4155}.toast{position:fixed;right:20px;bottom:20px;border-radius:14px;padding:11px 16px;background:#222634;color:#fff;box-shadow:0 14px 30px rgba(0,0,0,.18);z-index:100}.luck-filter-row{display:grid;grid-template-columns:minmax(280px,2fr) minmax(150px,1fr) minmax(130px,.8fr) minmax(150px,.8fr);gap:10px;margin-bottom:14px;padding:12px;border:1px solid #e3e6ee;border-radius:20px;background:#f8f9fc}.luck-filter-row input,.luck-filter-row select{width:100%;box-sizing:border-box;border:1px solid #d9dde6;border-radius:14px;background:#fff;color:#2a2f39;padding:11px 13px;outline:none;font:inherit}.luck-percent-filter{display:flex;align-items:center;gap:8px;color:#7b8190;font-size:11px}.luck-percent-filter span{white-space:nowrap}.luck-percent-filter input{min-width:0}
+.luck-message-form{display:grid;grid-template-columns:120px 120px minmax(220px,1fr) 90px;gap:10px;align-items:end;margin:14px 0}.luck-message-form label{display:grid;gap:5px;color:#7b8190;font-size:11px}.luck-message-form input,.luck-message-form select{width:100%}.luck-message-input{grid-column:1/4}.luck-enabled{display:flex!important;align-items:center;gap:7px;padding-bottom:10px}.luck-enabled input{width:auto}.luck-message-list{display:grid;gap:8px}.luck-message-row{display:grid;grid-template-columns:220px 1fr auto;gap:12px;align-items:center;border:1px solid #e7e9ef;border-radius:14px;padding:11px}.luck-message-row>div:first-child{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.luck-message-row span,.luck-message-row small{font-size:10px;color:#7b8190}.luck-message-row span{padding:2px 7px;border-radius:999px;background:#f1f2f6}.luck-message-row span.targeted{background:#f2f0ff;color:#6966c8}.luck-message-row p{margin:0;font-size:12px}.luck-admin-card{margin-top:14px}
+@media(max-width:900px){.luck-filter-row{grid-template-columns:1fr 1fr}.filter-search{grid-column:1/-1}.record-summary-grid{grid-template-columns:repeat(2,1fr)}.pool-stat-grid,.extreme-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:760px){.admin-header,.list-head,.record-toolbar,.analytics-title{display:grid}.dashboard-grid{grid-template-columns:1fr 1fr 1fr}.pool-row{grid-template-columns:58px 1fr}.pool-row img,.thumb-empty{width:58px;height:58px}.row-actions{grid-column:1/-1;justify-content:flex-end}.admin-wrap{width:min(100% - 20px,1280px);padding-top:16px}.analytics-total{text-align:left}.admin-tabs{width:100%}.admin-tabs button{flex:1;padding-inline:10px}}@media(max-width:520px){.luck-filter-row{grid-template-columns:1fr}.luck-filter-row .filter-search{grid-column:auto}.dashboard-grid,.record-summary-grid,.pool-stat-grid,.extreme-grid{grid-template-columns:1fr 1fr}.metric strong{font-size:21px}.list-card{padding:15px}}
 
 @media (max-width:1050px){
   .admin-filter-row{grid-template-columns:2fr 1fr 1fr}
