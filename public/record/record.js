@@ -18,7 +18,7 @@ const els = {
   characterFilter: $('characterFilter'), typeFilter: $('typeFilter'), recordFilter: $('recordFilter'), poolGrid: $('poolGrid'),
   emptyState: $('emptyState'), listSummary: $('listSummary'), editorModal: $('editorModal'), closeModalButton: $('closeModalButton'),
   editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'), cardRankList: $('cardRankList'),
-  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), goldCountInput: $('goldCountInput'), amountInput: $('amountInput'), luckPreview: $('luckPreview'),
+  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), goldCountInput: $('goldCountInput'), amountInput: $('amountInput'), recordNoteInput: $('recordNoteInput'), recordNoteCount: $('recordNoteCount'), luckPreview: $('luckPreview'),
   deleteRecordButton: $('deleteRecordButton'), saveRecordButton: $('saveRecordButton'), recordMessage: $('recordMessage'), toast: $('toast'),
 }
 
@@ -336,6 +336,8 @@ function openEditor(poolKey) {
   els.pullCountInput.value = record?.pull_count ?? ''
   els.goldCountInput.value = record?.gold_count ?? ''
   els.amountInput.value = record?.amount_twd ?? ''
+  els.recordNoteInput.value = record?.note ?? ''
+  els.recordNoteCount.textContent = String(els.recordNoteInput.value.length)
   els.deleteRecordButton.classList.toggle('hidden', !record)
   els.recordMessage.textContent = ''
   updateLuckPreview()
@@ -396,6 +398,7 @@ async function saveRecord(event) {
   const pullCount = Number(els.pullCountInput.value)
   const goldCount = Number(els.goldCountInput.value)
   const amountTwd = Number(els.amountInput.value)
+  const note = String(els.recordNoteInput.value || '').slice(0, 100)
   const limitedCopies = cards.reduce((sum, card) => sum + Number(card.rank) + 1, 0)
   if (!Number.isInteger(pullCount) || pullCount < 0) return void (els.recordMessage.textContent = '抽數只能輸入 0 以上的整數。')
   if (!Number.isInteger(goldCount) || goldCount < 0) return void (els.recordMessage.textContent = '出金總次數只能輸入 0 以上的整數。')
@@ -406,7 +409,7 @@ async function saveRecord(event) {
   setButtonLoading(els.saveRecordButton, true, '儲存中…')
   els.recordMessage.textContent = ''
   try {
-    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, cards, pullCount, goldCount, amountTwd }) })
+    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, cards, pullCount, goldCount, amountTwd, note }) })
     state.records.set(poolKey, {
       ...saved,
       pool_key: saved.pool_key || poolKey,
@@ -414,6 +417,7 @@ async function saveRecord(event) {
       pull_count: Number(saved.pull_count ?? pullCount),
       gold_count: Number(saved.gold_count ?? goldCount),
       amount_twd: Number(saved.amount_twd ?? amountTwd),
+      note: saved.note ?? note,
     })
     renderAll()
     closeEditor()
@@ -454,6 +458,7 @@ els.accountInput.addEventListener('input', sanitizeAccountInput)
 els.hunterCodeInput.addEventListener('input', sanitizeDigits)
 els.nicknameInput.addEventListener('input', sanitizeNickname)
 els.nicknameInput.addEventListener('compositionend', sanitizeNickname)
+els.recordNoteInput.addEventListener('input', () => { els.recordNoteCount.textContent = String(els.recordNoteInput.value.length) })
 els.pullCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateLuckPreview() })
 els.goldCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateLuckPreview() })
 els.amountInput.addEventListener('input', sanitizePositiveInteger)
