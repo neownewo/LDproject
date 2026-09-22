@@ -233,6 +233,7 @@ async function handleRecords(req, res) {
 
     const pullCount = parseInteger(body.pullCount)
     const goldCount = parseInteger(body.goldCount)
+    const selectBoxOpened = body.selectBoxOpened === true
     const amountTwd = parseInteger(body.amountTwd)
     const note = String(body.note ?? '')
     const rawCards = Array.isArray(body.cards) ? body.cards : []
@@ -262,11 +263,16 @@ async function handleRecords(req, res) {
       cards.push({ cardKey, cardIndex, cardLabel, imageUrl, rank })
     }
 
-    const limitedCopies = cards.reduce((sum, card) => sum + card.rank + 1, 0)
-    if (goldCount < limitedCopies) return sendError(res, 400, 'INVALID_GOLD_COUNT', `出金總次數至少要 ${limitedCopies} 次。`)
+    if (selectBoxOpened) {
+      const pools = await getRecordPools()
+      const pool = (Array.isArray(pools) ? pools : []).find((item) => item.poolKey === poolKey)
+      const minPulls = pool?.poolType === 'multi' ? 200 : pool?.poolType === 'daily' ? 150 : null
+      if (!minPulls) return sendError(res, 400, 'INVALID_SELECT_BOX', '這個卡池沒有自選盒紀錄。')
+      if (pullCount < minPulls) return sendError(res, 400, 'INVALID_SELECT_BOX', `此卡池需滿 ${minPulls} 抽才能開自選盒。`)
+    }
 
-    const saved = await upsertRecordEntry(session.userId, { poolKey, pullCount, goldCount, amountTwd, note, cards })
-    return res.status(200).json(saved || { pool_key: poolKey, pull_count: pullCount, gold_count: goldCount, amount_twd: amountTwd, note, cards })
+    const saved = await upsertRecordEntry(session.userId, { poolKey, pullCount, goldCount, selectBoxOpened, amountTwd, note, cards })
+    return res.status(200).json(saved || { pool_key: poolKey, pull_count: pullCount, gold_count: goldCount, select_box_opened: selectBoxOpened, amount_twd: amountTwd, note, cards })
   } catch (error) {
     console.error('record records failed', error)
     return sendError(res, 500, 'RECORD_FAILED', '紀錄儲存失敗，請稍後再試。')
