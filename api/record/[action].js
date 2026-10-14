@@ -16,6 +16,8 @@ import {
   deleteRecordEntry,
   findRecordUserByAccount,
   findRecordUserById,
+  findRecordUsersByNickname,
+  updateRecordHunterCode,
   listRecordEntries,
   touchRecordLastLogin,
   upsertRecordEntry,
@@ -113,6 +115,65 @@ async function handleRegister(req, res) {
       return sendError(res, 409, 'ACCOUNT_EXISTS', '這個帳號已經存在，請回登入畫面。')
     }
     return sendError(res, 500, 'REGISTER_FAILED', '建立帳號失敗，請稍後再試。')
+  }
+}
+
+async function handleResetCode(req, res) {
+  if (!onlyMethods(req, res, ['POST'])) return
+  const body = getJsonBody(req)
+  const account = String(body.account || '').trim()
+  const nickname = String(body.nickname || '').trim()
+  const hunterCode = String(body.hunterCode || '').trim()
+  const newHunterCode = String(body.newHunterCode || '').trim()
+  const supplied = [account, nickname, hunterCode].filter(Boolean).length
+
+  if (supplied < 2 ||
+      (account && !validateAccount(account)) ||
+      (nickname && !validateNickname(nickname)) ||
+      (hunterCode && !validateHunterCode(hunterCode)) ||
+      !validateHunterCode(newHunterCode)) {
+    return sendError(res, 400, 'INVALID_INPUT', '請至少填寫兩項正確格式的資料，並設定新的 5 位數登入碼。')
+  }
+
+  // 與登入共用限流機制；未提供帳號時以暱稱作為限制鍵。
+  const rate = checkLoginRateLimit(req, `reset:${account || nickname}`)
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', String(rate.retryAfter))
+    return sendError(res, 429, 'TOO_MANY_ATTEMPTS', '嘗試次數過多，請稍後再試。')
+  }
+
+  const invalid = async () => {
+    noteLoginFailure(rate.key)
+    await failureDelay()
+    return sendError(res, 401, 'INVALID_CREDENTIALS', '提供的資料無法完成驗證，請確認後重試。')
+  }
+
+  try {
+    let user = null
+    if (account) {
+      user = await findRecordUserByAccount(account)
+      if (!user || (nickname && user.nickname !== nickname)) return await invalid()
+      if (hunterCode && !(await verifyHunterCode(hunterCode, user.hunter_code_hash))) return await invalid()
+    } else {
+      // 暱稱可能重複。若無帳號，必須透過原登入碼唯一識別使用者。
+      const candidates = await findRecordUsersByNickname(nickname)
+      if (!Array.isArray(candidates) || candidates.length > 10) return await invalid()
+      const matches = []
+      for (const candidate of candidates) {
+        if (await verifyHunterCode(hunterCode, candidate.hunter_code_hash)) matches.push(candidate)
+      }
+      if (matches.length !== 1) return await invalid()
+      user = matches[0]
+    }
+
+    const nextHash = await hashHunterCode(newHunterCode)
+    await updateRecordHunterCode(user.id, nextHash)
+    clearLoginFailures(rate.key)
+    // 不自動登入，避免舊瀏覽器工作階段混淆。
+    return res.status(200).json({ ok: true })
+  } catch (error) {
+    console.error('record reset code failed', error)
+    return sendError(res, 500, 'RESET_FAILED', '暫時無法重設登入碼，請稍後再試。')
   }
 }
 
@@ -233,7 +294,6 @@ async function handleRecords(req, res) {
 
     const pullCount = parseInteger(body.pullCount)
     const goldCount = parseInteger(body.goldCount)
-    const selectBoxOpened = body.selectBoxOpened === true
     const amountTwd = parseInteger(body.amountTwd)
     const note = String(body.note ?? '')
     const rawCards = Array.isArray(body.cards) ? body.cards : []
@@ -263,16 +323,11 @@ async function handleRecords(req, res) {
       cards.push({ cardKey, cardIndex, cardLabel, imageUrl, rank })
     }
 
-    if (selectBoxOpened) {
-      const pools = await getRecordPools()
-      const pool = (Array.isArray(pools) ? pools : []).find((item) => item.poolKey === poolKey)
-      const minPulls = pool?.poolType === 'multi' ? 200 : pool?.poolType === 'daily' ? 150 : null
-      if (!minPulls) return sendError(res, 400, 'INVALID_SELECT_BOX', '這個卡池沒有自選盒紀錄。')
-      if (pullCount < minPulls) return sendError(res, 400, 'INVALID_SELECT_BOX', `此卡池需滿 ${minPulls} 抽才能開自選盒。`)
-    }
+    const limitedCopies = cards.reduce((sum, card) => sum + card.rank + 1, 0)
+    if (goldCount < limitedCopies) return sendError(res, 400, 'INVALID_GOLD_COUNT', `出金總次數至少要 ${limitedCopies} 次。`)
 
-    const saved = await upsertRecordEntry(session.userId, { poolKey, pullCount, goldCount, selectBoxOpened, amountTwd, note, cards })
-    return res.status(200).json(saved || { pool_key: poolKey, pull_count: pullCount, gold_count: goldCount, select_box_opened: selectBoxOpened, amount_twd: amountTwd, note, cards })
+    const saved = await upsertRecordEntry(session.userId, { poolKey, pullCount, goldCount, amountTwd, note, cards })
+    return res.status(200).json(saved || { pool_key: poolKey, pull_count: pullCount, gold_count: goldCount, amount_twd: amountTwd, note, cards })
   } catch (error) {
     console.error('record records failed', error)
     return sendError(res, 500, 'RECORD_FAILED', '紀錄儲存失敗，請稍後再試。')
@@ -282,6 +337,7 @@ async function handleRecords(req, res) {
 export default async function handler(req, res) {
   switch (actionName(req)) {
     case 'login': return handleLogin(req, res)
+    case 'reset-code': return handleResetCode(req, res)
     case 'register': return handleRegister(req, res)
     case 'session': return handleSession(req, res)
     case 'logout': return handleLogout(req, res)

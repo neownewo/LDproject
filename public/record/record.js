@@ -10,6 +10,9 @@ const state = {
 
 const $ = (id) => document.getElementById(id)
 const els = {
+  resetForm: $('resetForm'), showResetButton: $('showResetButton'), resetBackButton: $('resetBackButton'),
+  resetAccount: $('resetAccount'), resetNickname: $('resetNickname'), resetOldCode: $('resetOldCode'),
+  resetNewCode: $('resetNewCode'), resetMessage: $('resetMessage'), resetSubmitButton: $('resetSubmitButton'),
   authView: $('authView'), recordView: $('recordView'), loginForm: $('loginForm'), registerForm: $('registerForm'),
   accountInput: $('accountInput'), hunterCodeInput: $('hunterCodeInput'), nicknameInput: $('nicknameInput'),
   loginButton: $('loginButton'), registerButton: $('registerButton'), loginMessage: $('loginMessage'), registerMessage: $('registerMessage'),
@@ -19,7 +22,7 @@ const els = {
   characterFilter: $('characterFilter'), typeFilter: $('typeFilter'), recordFilter: $('recordFilter'), poolGrid: $('poolGrid'),
   emptyState: $('emptyState'), listSummary: $('listSummary'), editorModal: $('editorModal'), closeModalButton: $('closeModalButton'),
   editorImage: $('editorImage'), editorMeta: $('editorMeta'), editorTitle: $('editorTitle'), cardRankList: $('cardRankList'),
-  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), goldCountInput: $('goldCountInput'), selectBoxField: $('selectBoxField'), selectBoxOpenedInput: $('selectBoxOpenedInput'), selectBoxHelp: $('selectBoxHelp'), amountInput: $('amountInput'), recordNoteInput: $('recordNoteInput'), recordNoteCount: $('recordNoteCount'), luckPercentPanel: $('luckPercentPanel'), luckPercentValue: $('luckPercentValue'), luckPercentBar: $('luckPercentBar'), luckPercentMessage: $('luckPercentMessage'), luckPreview: $('luckPreview'),
+  recordForm: $('recordForm'), pullCountInput: $('pullCountInput'), goldCountInput: $('goldCountInput'), amountInput: $('amountInput'), recordNoteInput: $('recordNoteInput'), recordNoteCount: $('recordNoteCount'), luckPercentPanel: $('luckPercentPanel'), luckPercentValue: $('luckPercentValue'), luckPercentBar: $('luckPercentBar'), luckPercentMessage: $('luckPercentMessage'), luckPreview: $('luckPreview'),
   deleteRecordButton: $('deleteRecordButton'), saveRecordButton: $('saveRecordButton'), recordMessage: $('recordMessage'), toast: $('toast'),
 }
 
@@ -130,6 +133,54 @@ function showAuthView() {
   els.recordView.classList.add('hidden')
   els.loginForm.classList.remove('hidden')
   els.registerForm.classList.add('hidden')
+  els.resetForm.classList.add('hidden')
+}
+
+function showResetForm() {
+  els.loginForm.classList.add('hidden')
+  els.registerForm.classList.add('hidden')
+  els.resetForm.classList.remove('hidden')
+  els.resetMessage.textContent = ''
+  els.resetAccount.value = els.accountInput.value.trim()
+  els.resetNickname.value = ''
+  els.resetOldCode.value = ''
+  els.resetNewCode.value = ''
+}
+
+async function handleReset(event) {
+  event.preventDefault()
+  els.resetMessage.textContent = ''
+  const account = els.resetAccount.value.trim()
+  const nickname = els.resetNickname.value.trim()
+  const hunterCode = els.resetOldCode.value.trim()
+  const newHunterCode = els.resetNewCode.value.trim()
+  if ([account, nickname, hunterCode].filter(Boolean).length < 2) {
+    els.resetMessage.textContent = '請從帳號、暱稱、原登入碼中至少填寫兩項。'
+    return
+  }
+  if ((account && !/^[A-Za-z0-9]{1,50}$/.test(account)) ||
+      (nickname && !/^[\u3400-\u4DBF\u4E00-\u9FFF]{1,20}$/u.test(nickname)) ||
+      (hunterCode && !/^\d{5}$/.test(hunterCode)) ||
+      !/^\d{5}$/.test(newHunterCode)) {
+    els.resetMessage.textContent = '請確認帳號、中文暱稱與 5 位數登入碼格式。'
+    return
+  }
+  setButtonLoading(els.resetSubmitButton, true, '重設中…')
+  try {
+    await api('/api/record/reset-code', {
+      method: 'POST',
+      body: JSON.stringify({ account, nickname, hunterCode, newHunterCode }),
+    })
+    els.resetForm.reset()
+    showAuthView()
+    els.accountInput.value = account
+    els.hunterCodeInput.value = ''
+    els.loginMessage.textContent = '登入碼已重設成功 ✦ 請用新的登入碼登入。'
+  } catch (error) {
+    els.resetMessage.textContent = error.message || '重設失敗，請稍後再試。'
+  } finally {
+    setButtonLoading(els.resetSubmitButton, false)
+  }
 }
 
 async function handleLogin(event) {
@@ -268,34 +319,6 @@ function getPoolCards(pool) {
   return cards.length ? cards : [{ cardKey: 'card:0', cardIndex: 0, label: pool?.characters?.[0] || '卡片 1', imageUrl: pool?.images?.[0] || '' }]
 }
 
-function getSelectBoxRule(pool) {
-  if (pool?.poolType === 'multi') return { minPulls: 200, label: '混池滿 200 抽可開 1 次自選盒' }
-  if (pool?.poolType === 'daily') return { minPulls: 150, label: '日卡滿 150 抽可開 1 次自選盒' }
-  return null
-}
-
-function updateSelectBoxField() {
-  if (!els.selectBoxField || !els.selectBoxOpenedInput || !els.selectBoxHelp) return
-  const pool = state.pools.find((item) => item.poolKey === state.editingPoolKey)
-  const rule = getSelectBoxRule(pool)
-  if (!rule) {
-    els.selectBoxField.classList.add('hidden')
-    els.selectBoxOpenedInput.checked = false
-    els.selectBoxOpenedInput.disabled = true
-    return
-  }
-
-  const pulls = Number(els.pullCountInput.value || 0)
-  const eligible = pulls >= rule.minPulls
-  els.selectBoxField.classList.remove('hidden')
-  els.selectBoxField.classList.toggle('is-disabled', !eligible)
-  els.selectBoxOpenedInput.disabled = !eligible
-  if (!eligible) els.selectBoxOpenedInput.checked = false
-  els.selectBoxHelp.textContent = eligible
-    ? `${rule.label}；勾選後代表目前限定卡中有 1 張來自自選盒，不列入歐非計算。`
-    : `${rule.label}；目前抽數未達門檻。`
-}
-
 function getSavedRank(record, cardKey) {
   const card = (record?.cards || []).find((item) => item.card_key === cardKey || item.cardKey === cardKey)
   return card && Number.isInteger(Number(card.rank)) ? Number(card.rank) : null
@@ -393,8 +416,6 @@ function openEditor(poolKey) {
   }).join('')
   els.pullCountInput.value = record?.pull_count ?? ''
   els.goldCountInput.value = record?.gold_count ?? ''
-  if (els.selectBoxOpenedInput) els.selectBoxOpenedInput.checked = record?.select_box_opened === true
-  updateSelectBoxField()
   els.amountInput.value = record?.amount_twd ?? ''
   els.recordNoteInput.value = record?.note ?? ''
   els.recordNoteCount.textContent = String(els.recordNoteInput.value.length)
@@ -433,15 +454,13 @@ function updateLuckPreview() {
   const goldCount = Number(els.goldCountInput.value || 0)
   const cards = collectEditorCards()
   const limitedCopies = cards.reduce((sum, card) => sum + Number(card.rank) + 1, 0)
-  const selectBoxOpened = Boolean(els.selectBoxOpenedInput?.checked)
-  const luckLimitedCopies = Math.max(0, limitedCopies - (selectBoxOpened ? 1 : 0))
-  const limitedAverage = pulls > 0 && luckLimitedCopies > 0
-    ? Math.round(pulls / luckLimitedCopies)
+  const limitedAverage = pulls > 0 && limitedCopies > 0
+    ? Math.round(pulls / limitedCopies)
     : null
 
   if (!pulls || !goldCount) {
     const limitedText = limitedAverage !== null
-      ? `限定卡運氣｜抽卡取得 ${luckLimitedCopies} 張｜平均 ${limitedAverage} 抽 / 張限定卡${selectBoxOpened ? '｜另有自選盒 1 張' : ''}`
+      ? `限定卡運氣｜目前 ${limitedCopies} 張｜平均 ${limitedAverage} 抽 / 張限定卡`
       : '限定卡運氣｜尚未取得限定卡'
     els.luckPreview.innerHTML = `<span>簡易運氣評估</span><strong>輸入抽數與出金總次數後就會幫你算 ✦</strong><small>整體出金運氣會把限定卡與歪卡都算進去。</small><small class="limited-luck-note">${limitedText}（依疊卡層級換算）</small>`
     return
@@ -449,7 +468,7 @@ function updateLuckPreview() {
 
   const luck = getLuck({ pull_count: pulls, gold_count: goldCount })
   const limitedText = limitedAverage !== null
-    ? `限定卡運氣｜抽卡取得 ${luckLimitedCopies} 張｜平均 ${limitedAverage} 抽 / 張限定卡${selectBoxOpened ? '｜另有自選盒 1 張' : ''}`
+    ? `限定卡運氣｜目前 ${limitedCopies} 張｜平均 ${limitedAverage} 抽 / 張限定卡`
     : '限定卡運氣｜尚未取得限定卡'
 
   els.luckPreview.innerHTML = `<span>簡易運氣評估</span><strong>${escapeHtml(luck.label)}｜出金 ${goldCount} 次｜平均 ${Math.round(luck.average)} 抽 / 張五星</strong><small>整體出金運氣：限定卡＋歪卡的五星都算。</small><small class="limited-luck-note">${limitedText}（依疊卡層級換算）</small>`
@@ -464,23 +483,23 @@ async function saveRecord(event) {
   const goldCount = Number(els.goldCountInput.value)
   const amountTwd = Number(els.amountInput.value)
   const note = String(els.recordNoteInput.value || '').slice(0, 100)
-  const selectBoxOpened = Boolean(els.selectBoxOpenedInput?.checked)
+  const limitedCopies = cards.reduce((sum, card) => sum + Number(card.rank) + 1, 0)
   if (!Number.isInteger(pullCount) || pullCount < 0) return void (els.recordMessage.textContent = '抽數只能輸入 0 以上的整數。')
   if (!Number.isInteger(goldCount) || goldCount < 0) return void (els.recordMessage.textContent = '出金總次數只能輸入 0 以上的整數。')
   if (goldCount > pullCount) return void (els.recordMessage.textContent = '出金總次數不能大於總抽數。')
+  if (goldCount < limitedCopies) return void (els.recordMessage.textContent = `出金總次數至少要 ${limitedCopies} 次，因為你已紀錄取得 ${limitedCopies} 張限定五星。`)
   if (!Number.isInteger(amountTwd) || amountTwd < 0) return void (els.recordMessage.textContent = '課金金額只能輸入 0 以上的整數。')
 
   setButtonLoading(els.saveRecordButton, true, '儲存中…')
   els.recordMessage.textContent = ''
   try {
-    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, cards, pullCount, goldCount, selectBoxOpened, amountTwd, note }) })
+    const saved = await api('/api/record/records', { method: 'PUT', body: JSON.stringify({ poolKey, cards, pullCount, goldCount, amountTwd, note }) })
     state.records.set(poolKey, {
       ...saved,
       pool_key: saved.pool_key || poolKey,
       cards: Array.isArray(saved.cards) ? saved.cards : cards.map((card) => ({ card_key: card.cardKey, card_index: card.cardIndex, card_label: card.cardLabel, image_url: card.imageUrl, rank: card.rank })),
       pull_count: Number(saved.pull_count ?? pullCount),
       gold_count: Number(saved.gold_count ?? goldCount),
-      select_box_opened: saved.select_box_opened ?? selectBoxOpened,
       amount_twd: Number(saved.amount_twd ?? amountTwd),
       note: saved.note ?? note,
     })
@@ -524,11 +543,18 @@ els.hunterCodeInput.addEventListener('input', sanitizeDigits)
 els.nicknameInput.addEventListener('input', sanitizeNickname)
 els.nicknameInput.addEventListener('compositionend', sanitizeNickname)
 els.recordNoteInput.addEventListener('input', () => { els.recordNoteCount.textContent = String(els.recordNoteInput.value.length) })
-els.pullCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateSelectBoxField(); updateLuckPreview() })
+els.pullCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateLuckPreview() })
 els.goldCountInput.addEventListener('input', (event) => { sanitizePositiveInteger(event); updateLuckPreview() })
-els.selectBoxOpenedInput?.addEventListener('change', updateLuckPreview)
 els.amountInput.addEventListener('input', sanitizePositiveInteger)
 els.recordForm.addEventListener('change', (event) => { if (event.target.matches('.card-rank-item input[type="radio"]')) updateLuckPreview() })
+els.showResetButton.addEventListener('click', showResetForm)
+els.resetBackButton.addEventListener('click', showAuthView)
+els.resetForm.addEventListener('submit', handleReset)
+els.resetAccount.addEventListener('input', sanitizeAccountInput)
+els.resetNickname.addEventListener('input', sanitizeNickname)
+els.resetNickname.addEventListener('compositionend', sanitizeNickname)
+els.resetOldCode.addEventListener('input', sanitizeDigits)
+els.resetNewCode.addEventListener('input', sanitizeDigits)
 els.loginForm.addEventListener('submit', handleLogin)
 els.registerForm.addEventListener('submit', handleRegister)
 els.recordForm.addEventListener('submit', saveRecord)
