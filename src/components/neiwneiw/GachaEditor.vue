@@ -143,7 +143,7 @@ async function handleFiles(event) {
   try {
     for (const file of files) {
       const compressed = await compressImage(file)
-      if (compressed.compressedSize > 2 * 1024 * 1024) throw new Error('壓縮後圖片仍超過 2MB')
+      if (compressed.compressedSize > 2 * 1024 * 1024) throw new Error(`圖片仍超過 2MB（${(compressed.compressedSize / 1024).toFixed(0)} KB）`)
       const data = await blobToDataUrl(compressed.blob)
       const uploaded = await uploadAdminImage({
         data,
